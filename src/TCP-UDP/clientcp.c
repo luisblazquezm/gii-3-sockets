@@ -23,7 +23,8 @@
 #include "tftp.h"
 #include "../utils/utils.h"
 #include "../log/log.h"
-#define TAM_BUFF 512
+#define TAM_BUFF 512 //<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< Esto está mal, el que venia por defecto era 10 o algo asi
+
 
 /*
  *			M A I N
@@ -41,11 +42,11 @@ int main(int argc, char *argv[])
 //int argc;
 //char *argv[];
 {
-    int socket_descriptor;				/* connected socket descriptor */ // OJOOOOOOOO cambiado 
+    int socket_descriptor;		/* connected socket descriptor */ // OJOOOOOOOO cambiado 
     struct addrinfo hints, *res;
-    long timevar;			            /* contains time returned by time() */
-    struct sockaddr_in myaddr_in;	    /* for local socket address */
-    struct sockaddr_in servaddr_in;	    /* for server socket address */
+    long timevar;			/* contains time returned by time() */
+    struct sockaddr_in myaddr_in;	/* for local socket address */
+    struct sockaddr_in servaddr_in;	/* for server socket address */
     int addrlen, i, j, errcode;
     char buf[TAM_BUFFER];               /* This example uses TAM_BUFFER byte messages. */
     
@@ -53,6 +54,8 @@ int main(int argc, char *argv[])
     int tmp = 0;
     int msg_type = 0; // 0 Read , 1 Write //OJOOOOOOOOOOOOOO QUITAR EL = 0
     rw_msg_t *rw_msg;
+    ack_msg_t *ack_msg;
+    data_msg_t *data_msg;
     char filename[100];
 
 	tmp = test_args(argc, argv);
@@ -155,23 +158,26 @@ int main(int argc, char *argv[])
 			argv[1], ntohs(myaddr_in.sin_port), (char *) ctime(&timevar));
 
 	/* Quitar el bucle y enviar una petición de lectura o escritura dependiendo de lo que pida el usuario  */
-	
+	/* Creamos el buffer */
 
-	if (msg_type == 0) { // 0 is READ_MODE
-	    // Send read_write message
-		rw_msg = create_rw_msg(msg_type, filename);
-        if (send(socket_descriptor, rw_msg, sizeof(rw_msg), 0) == -1) {
-		    fprintf(stderr, "%s: Connection aborted on error ",	argv[0]);
-		    fprintf(stderr, "on send number %d\n", i);
-		    exit(1);
-	    }
-	} else if (msg_type == 1){ // 1 is WRITE_MODE
-	    rw_msg = create_data_msg(msg_type, filename);
-	    if (send(socket_descriptor, data_msg, sizeof(data_msg), 0) == -1) {
-		    fprintf(stderr, "%s: Connection aborted on error ",	argv[0]);
-		    fprintf(stderr, "on send number %d\n", i);
-		    exit(1);
-	    }
+
+
+	if (msg_type == READ_TYPE) { // 0 is READ_MODE
+	    	rw_msg = create_rw_msg(READ_TYPE, filename);
+		memcpy(buffer, rw_msg, sizeof(rw_msg));
+		if (send(socket_descriptor, buffer, sizeof(buffer), 0) == -1) {
+			    fprintf(stderr, "%s: send rw_message: Connection aborted on error ", argv[0]);
+			    fprintf(stderr, "on send number %d\n", i);
+			    exit(1);
+	    	}
+	} else if (msg_type == WRITE_TYPE){ // 1 is WRITE_MODE
+		rw_msg = create_rw_msg(WRITE_TYPE, filename);
+		memcpy(buffer, rw_msg, sizeof(rw_msg));
+		if (send(socket_descriptor, buffer, sizeof(buffer), 0) == -1) {
+			    fprintf(stderr, "%s: send rw_message: Connection aborted on error ", argv[0]);
+			    fprintf(stderr, "on send number %d\n", i);
+			    exit(1);
+	    	}
 	}
 
 	/*
@@ -244,6 +250,25 @@ int main(int argc, char *argv[])
 		
 		/* Print out message indicating the identity of this reply. */
 		printf("Received result number %d\n", *buf);
+	}
+
+	// Envia el ACK si es de lectura y el bloque de datos si es de escritura
+	if (msg_type == READ_TYPE) {
+	        ack_msg = create_ack_msg(ACK_TYPE, /* Number of block */);
+	        memcpy(buffer, ack_msg, sizeof(ack_msg));
+	        if (send(socket_descriptor, buffer, sizeof(buffer), 0) == -1) {
+		    fprintf(stderr, "%s: send ACK_message: Connection aborted on error ", argv[0]);
+		    fprintf(stderr, "on send number %d\n", i);
+		    exit(1);
+	        }
+	} else if (msg_type == WRITE_TYPE) {
+		data_msg = create_data_msg(DATA_TYPE, filename);
+	        memcpy(buffer, data_msg, sizeof(data_msg));
+	        if (send(socket_descriptor, buffer, sizeof(buffer), 0) == -1) {
+		    fprintf(stderr, "%s: send data_msg: Connection aborted on error ", argv[0]);
+		    fprintf(stderr, "on send number %d\n", i);
+		    exit(1);
+	        }
 	}
 
     /* Print message indicating completion of task. */

@@ -23,7 +23,34 @@ typedef struct rw_msg
     
 } rw_msg_t;
 
+typedef struct data_msg
+{
+    int msg_type;
+    int n_block;
+    char data[1000];
+    
+} data_msg_t;
+
+typedef struct ack_msg
+{
+    int msg_type;
+    int n_block;
+    
+} ack_msg_t;
+
+typedef struct error_msg
+{
+    int msg_type;
+    int error_code;
+    char error_msg[1000];
+    char byte;
+    
+} error_msg_t;
+
 rw_msg_t *create_rw_msg(int msg_type, char *filename);
+ack_msg_t *create_ack_msg(int n_block);
+data_msg_t *create_data_msg(int n_block, char *data);
+error_msg_t *create_error_msg(int error_code);
 
 #endif
 

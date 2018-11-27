@@ -44,36 +44,6 @@ void errout(char *);		/* declare error out routine */
 int FIN = 0;             /* Para el cierre ordenado */
 void finalizar(){ FIN = 1; }
 
-static sigset_t sigfullmask,
-                sigintdmask,
-                com1mask,
-                com2mask,
-                oldmask;
-                
-static struct sigaction sa_sigint,
-                        sa_com1,
-                        sa_com2;
-                        
-void siginthdlr_rw_msg(int signal);
-void com1hdlr_data_msg(int signal);
-void com2hdlr_ACK_msg(int signal);
-
-static int type_msg_rcv = 0; 
-// Esta variable será la que se cambiaran en las manejadoras de se las señales
-
-/*
- * El funcionamiento es el siguiente:
- *     - Mandamos y redefinimos SIGUSR1, SIGUSR2 Y SIGINT para avisar al servidor
- *       por que tipo de struct esperar en el rcv de la función serverTCP señalada
- *       con una flecha. En ese rcv le va a llegar cualquier cosa, ya sea un ACK, un data_msg o rw_msg
- *       y la unica manera de saber que tipo esperar a recivir es a través de señales.
- *       El cliente TCP envia una de las tres señales dependiendo de lo que vaya a enviar
- *       y el servidor tendra un manejador en el que recibirá la señal y sabrá diferenciarlo.
- *     - Este planteamiento nos ha surgido después de darnos cuenta que no podemos usar un struct
- *       generico para recibir el resto de struct porque se tiene que recibir el mismo tipo del struct
- *       que se envia en clienteTCP.
- */
-
 
 int main(int argc, char *argv[])
 //int argc;
@@ -91,48 +61,6 @@ int main(int argc, char *argv[])
     int numfds,s_mayor;
     char buffer[BUFFERSIZE];	                    /* buffer for packets to be read into */
     struct sigaction vec;
-    
-    /* Create the masks */
-    sigemptyset(&sigfullmask);
-    sigaddset(&sigintmask, SIGINT);
-    sigaddset(&sigintmask, SIGUSR1);
-    sigaddset(&sigintmask, SIGUSR2);
-    
-    sigemptyset(&sigintmask);
-    sigaddset(&sigintmask, SIGINT);
-    
-    sigemptyset(&com1mask);
-    sigaddset(&com1mask, SIGUSR1);
-    
-    sigemptyset(&com2mask);
-    sigaddset(&com2mask, SIGUSR2);
-    
-    /* Override the behaviour for used signals */
-    sa_sigint.sa_handler = siginthdlr_rw_msg;
-    sa_sigint.sa_mask = sigfullmask;
-    sa_sigint.sa_flags = 0;
-    sigaction(SIGINT, &sa_sigint, NULL);
-    
-    sa_com1.sa_handler = com1hdlr_data_msg;
-    sa_com1.sa_mask = sigfullmask;
-    sa_com1.sa_flags = 0;
-    sigaction(SIGUSR1, &sa_com1, NULL);
-    
-    sa_com2.sa_handler = com2hdlr_ACK_msg;
-    sa_com2.sa_mask = sigfullmask;
-    sa_com2.sa_flags = 0;
-    sigaction(SIGUSR2, &sa_com2, NULL);
-    
-    /* 
-     *  Bloqueamos las mascaras de las señales que hemos creado. Y mantenemos desbloqueada fullmask
-     *  y hacemos sigsuspend sobre ella para mantenernos a la espera de que lleguen cualquiera de las
-     *  3 señales (SIGINT, SIGUSR1, SIGUSR2) e ir bloqueandolas y desbloqueandolas según lleguen.
-     */
-     
-    sigprocmask(SIG_UNBLOCK, &sigfullmask, NULL);
-    sigprocmask(SIG_BLOCK, &sigintmask, &oldmask);
-    sigprocmask(SIG_BLOCK, &com1mask, NULL);
-    sigprocmask(SIG_BLOCK, &com2mask, NULL);
 
 		/* Create the listen socket. */
 	ls_TCP = socket (AF_INET, SOCK_STREAM, 0);
@@ -145,7 +73,7 @@ int main(int argc, char *argv[])
 	memset ((char *)&myaddr_in, 0, sizeof(struct sockaddr_in));
    	memset ((char *)&clientaddr_in, 0, sizeof(struct sockaddr_in));
 
-    addrlen = sizeof(struct sockaddr_in);
+    	addrlen = sizeof(struct sockaddr_in);
 
 		/* Set up address structure for the listen socket. */
 	myaddr_in.sin_family = AF_INET;
