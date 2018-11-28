@@ -56,7 +56,7 @@ data_msg_t *create_data_msg(int n_block, char *data)
     }
     
     data_msg->msg_type = DATA_TYPE;
-    data_msg->n_block = n_block; // I dont really know if this parameter is neccesary as it sends data packets in a sequential order.
+    data_msg->n_block = n_block + 1; // I dont really know if this parameter is neccesary as it sends data packets in a sequential order.
     strcpy(data, data_msg->data);
     
     return data_msg;
@@ -82,7 +82,7 @@ ack_msg_t *create_ack_msg(int n_block)
     }
     
     ack_msg->msg_type = ACK_TYPE;
-    ack_msg->n_block = n_block; // I dont really know if this parameter is neccesary as it sends data packets in a sequential order.
+    ack_msg->n_block = n_block + 1; // I dont really know if this parameter is neccesary as it sends data packets in a sequential order.
     
     return ack_msg;
 }

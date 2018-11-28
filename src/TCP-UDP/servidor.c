@@ -23,7 +23,7 @@
 #define PUERTO 17278
 #define ADDRNOTFOUND	0xffffffff	/* return address for unfound host */
 #define BUFFERSIZE	1024	/* maximum size of packets to be received */
-#define TAM_BUFFER 10
+#define TAM_BUFFER 512
 #define MAXHOST 128
 
 extern int errno;
@@ -285,10 +285,10 @@ void serverTCP(int s, struct sockaddr_in clientaddr_in)
 	char hostname[MAXHOST];		/* remote host's name string */
 
 	int len, len1, status;
-    struct hostent *hp;		/* pointer to host info for remote host */
-    long timevar;			/* contains time returned by time() */
+    	struct hostent *hp;		/* pointer to host info for remote host */
+    	long timevar;			/* contains time returned by time() */
     
-    struct linger linger;		/* allow a lingering, graceful close; */
+    	struct linger linger;		/* allow a lingering, graceful close; */
     				            /* used when setting SO_LINGER */
     				
 	/* Look up the host information for the remote host
@@ -342,13 +342,6 @@ void serverTCP(int s, struct sockaddr_in clientaddr_in)
 		 * follow, and the loop will be exited.
 		 */
 		 
-    /*
-     * Espera por cualquiera de las tres señales. Asi nos aseguramos de que la señal llegue antes
-     * de que el servidor reciba el ACK, data_msg o el rw_msg.
-     * OJOOO no sabemos si llega algo de estas tres cosas antes que la señal, estas se pierdan
-     * o se quedan en el socket hasta que alguien (el servidor) haga rcv().
-     */
-	sigsuspend(&sigfullmask); 
 		 
 		 
     /* Here receives ACK, data_msg and rw_msg. I mean, anything *///<-----------------------------------------------

@@ -4,8 +4,8 @@
 #define WRONG_MSG_TYPE  -1
 
 #define NETASCII_MODE	0
-#define OCTET_MODE	    1
-#define MAIL_MODE	    2
+#define OCTET_MODE	1
+#define MAIL_MODE	2
 
 #define READ_TYPE       1
 #define WRITE_TYPE      2
