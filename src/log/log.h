@@ -3,17 +3,7 @@
 
 #include <time.h>
 #include <stdint.h>
-
-#define NULL_PTR_ERROR          -1
-
-#define LOG_EMPTY_FILENAME_ERR 	1
-#define OPEN_FILE_ERROR 	    2
-#define WRITE_FILE_ERROR 	    3
-#define READ_FILE_ERROR 	    4
-#define CLOSE_FILE_ERROR        5
-
-#define TCP_PROTOCOL_CODE       0
-#define UDP_PROTOCOL_CODE       1
+#include "../utils/utils.h"
 
 typedef int protocol_code_t;
 typedef long ipadd_t;

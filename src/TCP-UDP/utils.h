@@ -7,9 +7,9 @@
 #define NULL_PTR_ERROR          -1
 
 #define LOG_EMPTY_FILENAME_ERR 	1
-#define OPEN_FILE_ERROR 	    2
-#define WRITE_FILE_ERROR 	    3
-#define READ_FILE_ERROR 	    4
+#define OPEN_FILE_ERROR 	2
+#define WRITE_FILE_ERROR 	3
+#define READ_FILE_ERROR 	4
 #define CLOSE_FILE_ERROR        5
 
 #define TCP_PROTOCOL_CODE       0

@@ -49,6 +49,7 @@ int test_args(int argc, char *argv[])
 
         } else if (argc >= 3){
 
+	/*
             // Comprobamos si los primeros argumentos son numeros
             i = 0;
             while (argv[1][i] != '\0'){
@@ -64,11 +65,6 @@ int test_args(int argc, char *argv[])
                 ++i;
             }
 
-            /* Comprobamos que el resto de argumentos no producen combinaciones
-             * no validas:
-             *      - No se repiten opciones
-             *      - No se dan PA y PD a la vez
-             */
             for (i = 3; i < argc; ++i){
 
                 j = 0;
@@ -103,9 +99,10 @@ int test_args(int argc, char *argv[])
                     return -1;
                 }
             }
+	*/
         }
 
-        return options;
+        return 1;
     }
 }
 
