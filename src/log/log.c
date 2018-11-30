@@ -4,7 +4,7 @@
 #include "log.h"
 #include "../utils/utils.h"
 
-char log_format[] = "%-30s%-15s%-15s%-5s%-10s%-20s%-20s\n";
+char log_format[] = "%-30s%-15s%-15s%-15s%-10s%-20s%-20s\n";
 
 char TCP_PROTOCOL_STR_DES[] = "TCP";
 char UDP_PROTOCOL_STR_DES[] = "UDP";
@@ -47,23 +47,38 @@ struct log_data *create_log_data(time_t time,
     }
     
     log_data->time = time;
+    
     if (client_host != NULL){
-        strcpy(client_host, log_data->client_host);
+        strncpy(log_data->client_host,
+                client_host,
+                sizeof(log_data->client_host));
     } else {
-        strcpy("", log_data->client_host);
+        strncpy(log_data->client_host,
+                "",
+                sizeof(log_data->client_host));
     }
     log_data->ip_address = ip_address;
     log_data->protocol_code = protocol_code;
     log_data->port = port;
+    
     if (operation != NULL){
-        strcpy(operation, log_data->operation);
+        strncpy(log_data->operation,
+                operation,
+                sizeof(log_data->operation));
     } else {
-        strcpy("", log_data->operation);
+        strncpy(log_data->operation,
+                "",
+                sizeof(log_data->operation));
     }
-    if (client_host != NULL){
-        strcpy(error_description, log_data->error_description);
+    
+    if (error_description != NULL){
+        strncpy(log_data->error_description,
+                error_description,
+                sizeof(log_data->error_description));
     } else {
-        strcpy("", log_data->error_description);
+        strncpy(error_description,
+                "",
+                sizeof(log_data->error_description));
     }
     
     return log_data;
@@ -108,29 +123,43 @@ int init_log_file(char* filename)
 
 int write_log_data(struct log_data *log_data, char *filename)
 {
+    int i;
     char buf[1000];
+    char time[100];
+    char port[10];
     FILE *ptr;
 
     if (log_data == NULL || filename == NULL){
         return NULL_PTR_ERROR;
     }
-    
-    if ((ptr = fopen(filename, "w")) == NULL){
+
+    if ((ptr = fopen(filename, "a")) == NULL){
         perror("write_log_data: error opening file");
         return OPEN_FILE_ERROR;
     }
     
+    // Get rid of ctime's '\n'
+    strncpy(time, ctime(&(log_data->time)), sizeof(time));
+    for (i = 0; i < strlen(time); ++i){
+        if (time[i] == '\n')
+            time[i] = '\0';
+        else if (time[i] == '\0')
+            break;
+    }
+    
+    snprintf(port, sizeof(port), "%d", log_data->port);
+
     snprintf(buf,
              sizeof(buf),
              log_format,
-             ctime(&(log_data->time)),
+             time,
              log_data->client_host,
              "127.0.0.1",
              protocol_tostring(log_data->protocol_code),
-             strfmt("%s", log_data->port),
+             port,
              log_data->operation,
              log_data->error_description);
-                      
+             
     if (fwrite(buf, strlen(buf), 1, ptr) != 1){
         printf("write_log_data: error writing to file \'%s\'\n", filename);
         return WRITE_FILE_ERROR;
