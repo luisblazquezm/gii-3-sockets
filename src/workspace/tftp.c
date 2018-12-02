@@ -59,7 +59,7 @@ ack_msg_t *create_ack_msg(int n_block)
     ack_msg_t *ack_msg;
     
     // Only two modes are available, read and write, as defined in tftp.h
-    if (n_block <= 0) {
+    if (n_block < 0) {
         printf("%s\n", "create_ack_msg: number of block incorrect");
         return NULL;
     }

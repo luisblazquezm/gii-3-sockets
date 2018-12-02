@@ -1,0 +1,19 @@
+Aqui esperando al CLIENT 
+LLega hasta el servidor. OK 
+Msg_type es 2
+
+Entro en WriteType
+Acabo en WriteType
+Servidor Envia el mensaje al cliente
+LLega hasta el servidor. OK 
+Msg_type es 3
+
+Entro en DataType
+Salgo de DataType
+Servidor Envia el mensaje al cliente
+LLega hasta el servidor. OK 
+Msg_type es 3
+
+Entro en DataType
+Salgo de DataType
+Servidor Envia el mensaje al cliente
