@@ -4,7 +4,7 @@
 #include "tftp.h"
 
 
-rw_msg_t *create_rw_msg(int msg_type, char *filename)
+rw_msg_t *create_rw_msg(msg_type_t msg_type, char *filename)
 {
     rw_msg_t *rw_msg;
     
@@ -33,12 +33,12 @@ rw_msg_t *create_rw_msg(int msg_type, char *filename)
 }
 
 
-data_msg_t *create_data_msg(int n_block)
+data_msg_t *create_data_msg(blockn_t n_block)
 {
     data_msg_t *data_msg;
     
     // Only two modes are available, read and write, as defined in tftp.h
-    if (n_block < 0) {
+    if (n_block <= 0) {
         printf("%s\n", "create_data_msg: number of block incorrect");
         return NULL;
     } 
@@ -54,7 +54,7 @@ data_msg_t *create_data_msg(int n_block)
     return data_msg;
 }
 
-ack_msg_t *create_ack_msg(int n_block)
+ack_msg_t *create_ack_msg(blockn_t n_block)
 {
     ack_msg_t *ack_msg;
     
@@ -75,7 +75,7 @@ ack_msg_t *create_ack_msg(int n_block)
     return ack_msg;
 }
 
-error_msg_t *create_error_msg(int error_code)
+error_msg_t *create_error_msg(error_code_t error_code)
 {
     error_msg_t *error_msg;
     char error_str[200];

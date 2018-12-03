@@ -405,7 +405,42 @@ printmtof("Aqui esperando al CLIENT ",
 		sprintf(prueba,"Msg_type es %d\n",msg_type);
 		printmtof(prueba,
 		                  "debug.txt");
-		switch(msg_type) {
+		switch(msg_type) { // <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< NOTE: EOF se alcanza se alcanza cuando se lee el final
+		                   //                                                                  del fichero. Los casos son:
+		                   //                                                                     a) la última lectura no son 512 bytes
+		                   //                                                                        (e.g., son 100 bytes)
+		                   //
+		                   //                                                                  data_msg->data: |abc...xyz000...000|
+		                   //                                                                                   \_______/\_______/
+		                   //                                                                                  100 bytes  412 bytes
+		                   //
+		                   //                                                                  En ese caso se envia el mensaje y se cierra la
+		                   //                                                                  conexion.
+		                   //                                                                      b) la última lectura lee todo el fichero,
+		                   //                                                                         coincidiendo justo con 512 bytes. En
+		                   //                                                                         este caso hay que generar dos mensajes:
+		                   //                                                                         el primero contiene los datos leídos;
+		                   //                                                                         el segundo es el mensaje vacío que espe-
+		                   //                                                                         cifica el protocolo (TFTP)
+		                   //
+		                   //                                                                  data_msg1->data: |abc...xyz|
+		                   //                                                                                    \_______/
+		                   //                                                                                    512 bytes
+		                   //
+		                   //                                                                  data_msg2->data: |000...000|
+		                   //                                                                                    \_______/
+		                   //                                                                                    512 bytes
+		                   //
+		                   //                                                                  Tras enviar los dos mensajes, se cierra la
+		                   //                                                                  conexión.
+		                   //                                                                      Entonces, cuando el cliente lee y el servidor
+		                   //                                                                  escribe (modo READ), el servidor debe comprobar
+		                   //                                                                  cuando alcanza EOF y cerrar la conexión después.
+		                   //                                                                  En el caso en que el cliente escribe y el servidor
+		                   //                                                                  lee (modo WRITE), el cliente debe comprobar cuando
+		                   //                                                                  alcanza EOF y terminar de enviar ahi. En ambos
+		                   //                                                                  casos el receptor debe detectar el ultimo mensaje
+		                   //                                                                  (que tiene menos de 512 bytes).
 		case READ_TYPE:
 		    
 		    memcpy((void *)&rw_msg, (const void *)&buf, sizeof(rw_msg));
@@ -476,7 +511,7 @@ printmtof("Aqui esperando al CLIENT ",
 			
 		    memcpy((void *)&ack_msg, (const void *)&buf, sizeof(ack_msg));
 		    
-		    if (-1 != last_block && last_block == ack_msg.n_block){
+		    if (0 != last_block && last_block == ack_msg.n_block){
 			printmtof("GOTO ",
 		                  "debug.txt");
 		        goto END_OF_FILE;

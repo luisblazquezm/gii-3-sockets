@@ -15,9 +15,13 @@
 
 #define TFTP_DATA_SIZE 512
 
+typedef uint16_t msg_type_t;
+typedef uint16_t blockn_t;
+typedef uint16_t error_code_t;
+
 typedef struct rw_msg
 {
-    int msg_type;
+    msg_type_t msg_type;
     char filename[1000];
     char byte_1;
     char mode[10];
@@ -27,32 +31,32 @@ typedef struct rw_msg
 
 typedef struct data_msg
 {
-    int msg_type;
-    int n_block;
+    msg_type_t msg_type;
+    blockn_t n_block;
     char data[TFTP_DATA_SIZE];
     
 } data_msg_t;
 
 typedef struct ack_msg
 {
-    int msg_type;
-    int n_block;
+    msg_type_t msg_type;
+    blockn_t n_block;
     
 } ack_msg_t;
 
 typedef struct error_msg
 {
-    int msg_type;
-    int error_code;
+    msg_type_t msg_type;
+    error_code_t error_code;
     char error_msg[1000];
     char byte;
     
 } error_msg_t;
 
-rw_msg_t *create_rw_msg(int msg_type, char *filename);
-ack_msg_t *create_ack_msg(int n_block);
-data_msg_t *create_data_msg(int n_block);
-error_msg_t *create_error_msg(int error_code);
+rw_msg_t *create_rw_msg(msg_type_t msg_type, char *filename);
+ack_msg_t *create_ack_msg(blockn_t n_block);
+data_msg_t *create_data_msg(blockn_t n_block);
+error_msg_t *create_error_msg(error_code_t error_code);
 
 #endif
 

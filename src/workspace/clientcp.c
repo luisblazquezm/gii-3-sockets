@@ -49,6 +49,7 @@ char *argv[];
 	int addrlen, i, j, errcode;
     /* This example uses TAM_BUFFER byte messages. */
 	char buf[TAM_BUFFER];
+	int eof_flag;
 	
 	/* VARIABLES UTILIZADAS POR NOSOTROS */
 	
@@ -160,10 +161,14 @@ char *argv[];
 
 
     // R/W Request
-    if (tcp_mode == READ_TYPE)
+    
+    eof_flag = 0;
+    
+    if (tcp_mode == READ_TYPE){
     	rw_msg = create_rw_msg(READ_TYPE, rfilename);
-    else if (tcp_mode == WRITE_TYPE)
-	rw_msg = create_rw_msg(WRITE_TYPE, wfilename);
+    } else if (tcp_mode == WRITE_TYPE) {
+	    rw_msg = create_rw_msg(WRITE_TYPE, wfilename);
+	}
 
     memcpy((void *)buf, (const void *)rw_msg, sizeof(*rw_msg));
 
@@ -205,7 +210,7 @@ char *argv[];
 
 	while (i = recv(s, buf, TAM_BUFFER, 0)) {
 		if (i == -1) {
-            		perror(argv[0]);
+            perror(argv[0]);
 			fprintf(stderr, "%s: error reading result\n", argv[0]);
 			exit(1);
 		}
@@ -248,13 +253,13 @@ char *argv[];
 		     }
 		     
 		     if (1 != fread((void *)&(data_msg_rcv->data), sizeof(data_msg_rcv->data), 1, ptr)){
-	             	     if (ferror(ptr)) {
-			        fprintf(stderr,"cliente.c: ACK_TYPE: error in fread");
-			        return -1;
-			     } else if (feof(ptr)) {
-				fprintf(stderr,"Reached END OF FILE\n");
-				return -1;//<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< Hay que quitar este return para  dejarle escribir el ultimo bloque porque sino de los 69 solo escribe 53 lineas.
-			     }
+                if (ferror(ptr)) {
+                    fprintf(stderr,"cliente.c: ACK_TYPE: error in fread");
+                    return -1;
+                } else if (feof(ptr)) {
+                    fprintf(stderr,"Reached END OF FILE\n");
+                    eof_flag = 1; // <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< // Flag set
+                }
 		     }
 		     
 		     if (0 != fclose(ptr)){
@@ -273,6 +278,10 @@ char *argv[];
 		     if (send(s, buf, TAM_BUFFER, 0) != TAM_BUFFER){
 		        printf("clientcp.c: ACK_TYPE: error in send\n");
 	                return -1;
+		     }
+		     
+		     if (eof_flag){
+		        // <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< TODO: End of transmission
 		     }
 
 		
