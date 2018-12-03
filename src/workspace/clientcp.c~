@@ -258,7 +258,7 @@ char *argv[];
                     return -1;
                 } else if (feof(ptr)) {
                     fprintf(stderr,"Reached END OF FILE\n");
-                    eof_flag = 1;
+                    eof_flag = 1; // <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< // Flag set
                 }
 		     }
 		     
@@ -281,7 +281,7 @@ char *argv[];
 		     }
 		     
 		     if (eof_flag){
-		        // <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< TODO: End of transmission
+		        goto END_OF_TRANSMISSION;
 		     }
 
 		
@@ -347,6 +347,8 @@ char *argv[];
 			/* Print out message indicating the identity of this reply. */
 		//printf("Received result number %d\n", *buf);
 	}
+
+END_OF_TRANSMISSION:
 
     /* Print message indicating completion of task. */
 	time(&timevar);
