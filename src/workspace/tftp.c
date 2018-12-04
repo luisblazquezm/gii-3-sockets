@@ -38,7 +38,7 @@ data_msg_t *create_data_msg(blockn_t n_block)
     data_msg_t *data_msg;
     
     // Only two modes are available, read and write, as defined in tftp.h
-    if (n_block <= 0) {
+    if (n_block < 0) {
         printf("%s\n", "create_data_msg: number of block incorrect");
         return NULL;
     } 
@@ -59,7 +59,7 @@ ack_msg_t *create_ack_msg(blockn_t n_block)
     ack_msg_t *ack_msg;
     
     // Only two modes are available, read and write, as defined in tftp.h
-    if (n_block <= 0) {
+    if (n_block < 0) {
         printf("%s\n", "create_ack_msg: number of block incorrect");
         return NULL;
     }
@@ -122,3 +122,73 @@ error_msg_t *create_error_msg(error_code_t error_code)
 
     return error_msg;
 }
+
+int read_from_file(data_msg_t *data_msg, char *filename, int pos)
+{
+    FILE *f = open_file(filename, "r");
+    
+    if (f == NULL) return -1;
+     
+    if ((locate_in_file_position(f, pos)) == -1) return -1; //nwrittenbytes
+     
+     if (1 != fread((void *)&(data_msg->data), sizeof(data_msg->data), 1, f)){
+        if (ferror(f)) {
+            fprintf(stderr,"tftp.c: read_from_file: error in fread");
+            return -1;
+        } else if (feof(f)) {
+            return data_msg->n_block;
+        }
+     }
+     
+     if (0 != fclose(f)){
+         fprintf(stderr,"tftp.c: read_from_file: error in fclose");
+         return -1;
+     }
+
+     return 0;
+}
+
+int write_data_into_file(data_msg_t data_msg, char *filename, int pos)
+{
+    FILE *f = open_file(filename, "a");
+    
+    if (f == NULL) return -1;
+    
+    if ((locate_in_file_position(f, pos)) == -1) return -1; //nwrittenbytes
+    
+    if (1 != fwrite((void *)&(data_msg.data), sizeof(data_msg.data), 1, f)){
+        fprintf(stderr,"tftp.c: write_data_into_file: error in fwrite\n");
+        return -1;
+    }
+
+    if (0 != fclose(f)){
+        fprintf(stderr,"tftp.c: write_data_into_file: error in fclose\n");
+        return -1;
+    }
+    
+    return 0;
+}
+
+FILE* open_file(char *filename, char *file_mode)
+{
+    FILE *f = NULL;
+    
+    if ((f = fopen(filename, file_mode)) == NULL) {
+        fprintf(stderr,"tftp.c: create_file: could not open file to read\n");
+        return NULL;
+    }
+    
+    return f;
+    
+}
+
+int locate_in_file_position(FILE *f, int pos)
+{
+    if (0 != fseek(f, pos, SEEK_SET)) {
+        fprintf(stderr,"tftp.c: locate_in_file_position: error in fseek\n");
+        return -1;
+    }
+    
+    return 0;
+}
+

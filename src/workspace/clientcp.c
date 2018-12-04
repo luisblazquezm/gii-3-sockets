@@ -77,19 +77,10 @@ char *argv[];
 		fprintf(stderr, "Usage:  %s %s <[r|w] request>\n", argv[0], argv[1]);
 		exit(1);
 	} else if (argc == 3) {
-		tcp_mode = READ_TYPE; //<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< Lo tengo por defecto puesto en modo lectura
-/*
-		if (strcmp(argv[2],"r")){
-			tcp_mode = READ_TYPE;
-			fprintf(stderr, "Seleccionado modo R");
-		} else if (strcmp(argv[2],"w")){
-			tcp_mode = WRITE_TYPE;
-			fprintf(stderr, "Seleccionado modo W");
-		}
-*/
+		tcp_mode = WRITE_TYPE; //<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< Lo tengo por defecto puesto en modo lectura
+
 	}
 
-	/* Create the socket. */
 	s = socket (AF_INET, SOCK_STREAM, 0);
 	if (s == -1) {
 		perror(argv[0]);
@@ -97,50 +88,33 @@ char *argv[];
 		exit(1);
 	}
 	
-	/* clear out address structures */
 	memset ((char *)&myaddr_in, 0, sizeof(struct sockaddr_in));
 	memset ((char *)&servaddr_in, 0, sizeof(struct sockaddr_in));
 
-	/* Set up the peer address to which we will connect. */
 	servaddr_in.sin_family = AF_INET;
 	
-	/* Get the host information for the hostname that the
-	 * user passed in. */
-      memset (&hints, 0, sizeof (hints));
-      hints.ai_family = AF_INET;
- 	 /* esta función es la recomendada para la compatibilidad con IPv6 gethostbyname queda obsoleta*/
+    memset (&hints, 0, sizeof (hints));
+    hints.ai_family = AF_INET;
+
     errcode = getaddrinfo (argv[1], NULL, &hints, &res); 
     if (errcode != 0){
-			/* Name was not found.  Return a
-			 * special value signifying the error. */
 		fprintf(stderr, "%s: No es posible resolver la IP de %s\n",
 				argv[0], argv[1]);
 		exit(1);
-        }
-    else {
-		/* Copy address of host */
+    } else {
 		servaddr_in.sin_addr = ((struct sockaddr_in *) res->ai_addr)->sin_addr;
-	    }
+	}
+	
     freeaddrinfo(res);
 
-    /* puerto del servidor en orden de red*/
 	servaddr_in.sin_port = htons(PUERTO);
 
-		/* Try to connect to the remote server at the address
-		 * which was just built into peeraddr.
-		 */
 	if (connect(s, (const struct sockaddr *)&servaddr_in, sizeof(struct sockaddr_in)) == -1) {
 		perror(argv[0]);
 		fprintf(stderr, "%s: unable to connect to remote\n", argv[0]);
 		exit(1);
 	}
-		/* Since the connect call assigns a free address
-		 * to the local end of this connection, let's use
-		 * getsockname to see what it assigned.  Note that
-		 * addrlen needs to be passed in as a pointer,
-		 * because getsockname returns the actual length
-		 * of the address.
-		 */
+
 	addrlen = sizeof(struct sockaddr_in);
 	if (getsockname(s, (struct sockaddr *)&myaddr_in, &addrlen) == -1) {
 		perror(argv[0]);
@@ -148,19 +122,13 @@ char *argv[];
 		exit(1);
 	 }
 
-	/* Print out a startup message for the user. */
 	time(&timevar);
-	/* The port number must be converted first to host byte
-	 * order before printing.  On most hosts, this is not
-	 * necessary, but the ntohs() call is included here so
-	 * that this program could easily be ported to a host
-	 * that does require it.
-	 */
+
 	printf("Connected to %s on port %u at %s",
 			argv[1], ntohs(myaddr_in.sin_port), (char *) ctime(&timevar));
 
 
-    // R/W Request
+    /* R/W REQUEST CLIENT ---> SERVER */
     
     eof_flag = 0;
     
@@ -171,43 +139,17 @@ char *argv[];
 	}
 
     memcpy((void *)buf, (const void *)rw_msg, sizeof(*rw_msg));
-
+    printf("Enviando el fichero %s\n", rw_msg->filename);
+    
     if (send(s, buf, TAM_BUFFER, 0) != TAM_BUFFER) {
 		fprintf(stderr, "%s: Connection aborted on error ",	argv[0]);
 		fprintf(stderr, "on send number %d\n", i);
 		exit(1);
 	}
     
-    /*
-	for (i = 1; i <= 5; i++) {
-		*buf = i;
-		if (send(s, buf, TAM_BUFFER, 0) != TAM_BUFFER) {
-			fprintf(stderr, "%s: Connection aborted on error ",	argv[0]);
-			fprintf(stderr, "on send number %d\n", i);
-			exit(1);
-		}
-	}
-    */
-		/* Now, shutdown the connection for further sends.
-		 * This will cause the server to receive an end-of-file
-		 * condition after it has received all the requests that
-		 * have just been sent, indicating that we will not be
-		 * sending any further requests.
-		 */
-/*
-	if (shutdown(s, 1) == -1) {
-		perror(argv[0]);
-		fprintf(stderr, "%s: unable to shutdown socket\n", argv[0]);
-		exit(1);
-	}
-*/
-		/* Now, start receiving all of the replys from the server.
-		 * This loop will terminate when the recv returns zero,
-		 * which is an end-of-file condition.  This will happen
-		 * after the server has sent all of its replies, and closed
-		 * its end of the connection.
-		 */
-
+    
+    /* RECEPTION CLIENT <--- SERVER */
+    
 	while (i = recv(s, buf, TAM_BUFFER, 0)) {
 		if (i == -1) {
             perror(argv[0]);
@@ -226,66 +168,37 @@ char *argv[];
 			i += j;
 		}
 		
-		fprintf(stderr,"VOY A RECIBIR DESDE CLIENTE\n");
 		msg_type = *buf;
-		fprintf(stderr,"EN CLIENTE %d\n",msg_type);
-
+		
 		switch(msg_type) {
 		case ACK_TYPE:
-		    fprintf(stderr,"EN ACK_TYPE\n");
 		    memcpy((void *)&ack_msg_rcv, (const void *)&buf, sizeof(ack_msg));		
 	
+	        if (0 != last_block && last_block == ack_msg_rcv.n_block){
+	            fprintf(stderr,"\nReached end of file\n\n");
+	            eof_flag = 1;
+	            break;
+		     }
 		    /*
 		     * Para el ACK X:
 		     *      1- Enviar bloque X + 1
 		     */
 
 		     data_msg_rcv = create_data_msg(ack_msg_rcv.n_block + 1);
-
-		     if ((ptr = fopen(rfilename, "r")) == NULL) {
-		        fprintf(stderr,"cliente.c: ACK_TYPE: could not open file to read: %s ", rfilename);
-		        return -1;
-		     }
 		     
-		     if (0 != fseek(ptr, nreadbytes, SEEK_SET)) {
-		        fprintf(stderr,"cliente.c: ACK_TYPE: error in fseek");
-		        return -1;
-		     }
-		     
-		     if (1 != fread((void *)&(data_msg_rcv->data), sizeof(data_msg_rcv->data), 1, ptr)){
-		        if (ferror(ptr)) {
-		            fprintf(stderr,"cliente.c: ACK_TYPE: error in fread");
-		            return -1;
-		        } else if (feof(ptr)) {
-		            fprintf(stderr,"Reached END OF FILE\n");
-		            eof_flag = 1; // <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< // Flag set
-		        }
-		     }
-		     
-		     if (0 != fclose(ptr)){
-		         fprintf(stderr,"cliente.c: ACK_TYPE: error in fclose");
-	             	 return -1;
-		     }
-		     
-		     ptr = NULL;
+		     if ((last_block = read_from_file(data_msg_rcv, rfilename, nreadbytes)) == -1){
+                    fprintf(stderr, "clientcp.c: DATA_TYPE: error in read_from_file\n");
+	                return -1;
+             }
 		     
 		     printf("Received ACK number %d\n", ack_msg_rcv.n_block);
-
 		     memcpy((void *)buf, (const void *)data_msg_rcv, sizeof(*data_msg_rcv));
-
 		     nreadbytes += TFTP_DATA_SIZE;
 
 		     if (send(s, buf, TAM_BUFFER, 0) != TAM_BUFFER){
 		        printf("clientcp.c: ACK_TYPE: error in send\n");
 	                return -1;
 		     }
-		     
-		     if (eof_flag){
-		        time(&timevar);
-			    printf("All done at %s", (char *) ctime(&timevar));
-			    return 0;
-		     }
-
 		
 		break;
 		case DATA_TYPE:
@@ -297,35 +210,16 @@ char *argv[];
 		     *      1- Escribir DATA X
 		     *      2- Mandar ACK (n = X)
 		     */
-            if (TFTP_DATA_SIZE == strlen(data_msg.data)) {		     
-
-                if ((ptr = fopen(wfilename, "a")) == NULL) {
-                    printf("clientcp.c: DATA_TYPE: could not open file to read\n");
-                    return -1;
+            if (TFTP_DATA_SIZE == strlen(data_msg.data)) { // DATA = 512     
+                
+                if ((write_data_into_file(data_msg, wfilename, nwrittenbytes)) == -1){
+                    fprintf(stderr, "clientcp.c: DATA_TYPE: error in write_data_into_file\n");
+	                return -1;
                 }
-
-                if (0 != fseek(ptr, nwrittenbytes, SEEK_SET)) {
-                    printf("clientcp.c: DATA_TYPE: error in fseek\n");
-                    return -1;
-                }
-
-                if (1 != fwrite((void *)&(data_msg.data), sizeof(data_msg.data), 1, ptr)){
-                    printf("clientcp.c: DATA_TYPE: error in fwrite\n");
-                    return -1;
-                }
-
-                if (0 != fclose(ptr)){
-                    printf("clientcp.c: DATA_TYPE: error in fclose\n");
-                    return -1;
-                }
-                ptr = NULL;
-
+                
                 printf("Received block number %d\n", data_msg.n_block);
-
                 ack_msg = create_ack_msg(data_msg.n_block);
-
                 memcpy((void *)buf, (const void *)ack_msg, sizeof(*ack_msg));
-
                 nwrittenbytes += TFTP_DATA_SIZE;
                 
                 if (send(s, buf, TAM_BUFFER, 0) != TAM_BUFFER){
@@ -333,65 +227,40 @@ char *argv[];
 	                return -1;
 		        }
                 
-            } else if (TFTP_DATA_SIZE > strlen(data_msg.data)) {
-            
-                if ((ptr = fopen(wfilename, "a")) == NULL) {
-                    printf("clientcp.c: DATA_TYPE: could not open file to read\n");
-                    return -1;
+            } else if (TFTP_DATA_SIZE > strlen(data_msg.data)) { // DATA < 512  
+   
+                if ((write_data_into_file(data_msg, wfilename, nwrittenbytes)) == -1){
+                    fprintf(stderr, "clientcp.c: DATA_TYPE: error in write_data_into_file\n");
+	                return -1;
                 }
-
-                if (0 != fseek(ptr, nwrittenbytes, SEEK_SET)) {
-                    printf("clientcp.c: DATA_TYPE: error in fseek\n");
-                    return -1;
-                }
-
-                if (1 != fwrite((void *)&(data_msg.data), sizeof(data_msg.data), 1, ptr)){
-                    printf("clientcp.c: DATA_TYPE: error in fwrite\n");
-                    return -1;
-                }
-
-                if (0 != fclose(ptr)){
-                    printf("clientcp.c: DATA_TYPE: error in fclose\n");
-                    return -1;
-                }
-                ptr = NULL;
-
+                    
                 printf("Received block number %d\n", data_msg.n_block);
 
                 ack_msg = create_ack_msg(data_msg.n_block);
-
                 memcpy((void *)buf, (const void *)ack_msg, sizeof(*ack_msg));
-
                 nwrittenbytes += strlen(data_msg.data);
                 
                 if (send(s, buf, TAM_BUFFER, 0) != TAM_BUFFER){
-		            printf("clientcp.c: DATA_TYPE: error in send\n");
+		            fprintf(stderr, "clientcp.c: DATA_TYPE: error in send\n");
 	                return -1;
 		        }
 		        
-		        time(&timevar);
-	            printf("All done at %s", (char *) ctime(&timevar));
-	            return 0;
+		        eof_flag = 1;
 		         
-            } else if (0 == strlen(data_msg.data)) {
+            } else if (0 == strlen(data_msg.data)) { // DATA = 0
             
                 printf("Received block number %d\n", data_msg.n_block);
-
                 ack_msg = create_ack_msg(data_msg.n_block);
-
                 memcpy((void *)buf, (const void *)ack_msg, sizeof(*ack_msg));
-                
+              
                 if (send(s, buf, TAM_BUFFER, 0) != TAM_BUFFER){
 	                printf("clientcp.c: DATA_TYPE: error in send\n");
                     return -1;
 	            }
 	            
-	            time(&timevar);
-                printf("All done at %s", (char *) ctime(&timevar));
-                return 0;
-            }
-
-		     
+	            eof_flag = 1;
+	            
+            } 
 
 		break;
 		case ERROR_TYPE:
@@ -407,8 +276,8 @@ char *argv[];
 		break;
 		}
 		
-			/* Print out message indicating the identity of this reply. */
-		//printf("Received result number %d\n", *buf);
+		if(eof_flag)
+		    break;
 	}
 
     /* Print message indicating completion of task. */

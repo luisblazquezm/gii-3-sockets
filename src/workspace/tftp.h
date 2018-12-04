@@ -2,6 +2,7 @@
 #define __TFTP_H
 
 #include <inttypes.h>
+#include <stdio.h>
 
 #define WRONG_MSG_TYPE  -1
 
@@ -59,6 +60,11 @@ rw_msg_t *create_rw_msg(msg_type_t msg_type, char *filename);
 ack_msg_t *create_ack_msg(blockn_t n_block);
 data_msg_t *create_data_msg(blockn_t n_block);
 error_msg_t *create_error_msg(error_code_t error_code);
+
+int read_from_file(data_msg_t *data_msg, char *filename, int pos);
+int write_data_into_file(data_msg_t data_msg, char *filename, int pos);
+FILE* open_file(char *filename, char *file_mode);
+int locate_in_file_position(FILE *f, int pos);
 
 #endif
 

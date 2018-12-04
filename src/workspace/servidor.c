@@ -304,6 +304,7 @@ void serverTCP(int s, struct sockaddr_in clientaddr_in)
      short msg_type = 0;
      FILE *ptr = NULL;
      int last_block = 0;
+     int eof_flag;
    /*******************************************************************/
 
 
@@ -368,8 +369,7 @@ void serverTCP(int s, struct sockaddr_in clientaddr_in)
 		 * how the server will know that no more requests will
 		 * follow, and the loop will be exited.
 		 */
-printmtof("Aqui esperando al CLIENT ",
-		                  "debug.txt");
+
 	while (len = recv(s, buf, TAM_BUFFER, 0)) {
 		if (len == -1) errout(hostname); /* error from recv */
 			/* The reason this while loop exists is that there
@@ -399,48 +399,8 @@ printmtof("Aqui esperando al CLIENT ",
 	
 		// Vamo a aserlo con 1 fixero
 		// Ya si eso luego bien (arrays dinamicos con structs para cada fichero)
-		printmtof("LLega hasta el servidor. OK ",
-		                  "debug.txt");
-		char prueba[100];
-		sprintf(prueba,"Msg_type es %d\n",msg_type);
-		printmtof(prueba,
-		                  "debug.txt");
-		switch(msg_type) { // <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< NOTE: EOF se alcanza se alcanza cuando se lee el final
-		                   //                                                                  del fichero. Los casos son:
-		                   //                                                                     a) la última lectura no son 512 bytes
-		                   //                                                                        (e.g., son 100 bytes)
-		                   //
-		                   //                                                                  data_msg->data: |abc...xyz000...000|
-		                   //                                                                                   \_______/\_______/
-		                   //                                                                                  100 bytes  412 bytes
-		                   //
-		                   //                                                                  En ese caso se envia el mensaje y se cierra la
-		                   //                                                                  conexion.
-		                   //                                                                      b) la última lectura lee todo el fichero,
-		                   //                                                                         coincidiendo justo con 512 bytes. En
-		                   //                                                                         este caso hay que generar dos mensajes:
-		                   //                                                                         el primero contiene los datos leídos;
-		                   //                                                                         el segundo es el mensaje vacío que espe-
-		                   //                                                                         cifica el protocolo (TFTP)
-		                   //
-		                   //                                                                  data_msg1->data: |abc...xyz|
-		                   //                                                                                    \_______/
-		                   //                                                                                    512 bytes
-		                   //
-		                   //                                                                  data_msg2->data: |000...000|
-		                   //                                                                                    \_______/
-		                   //                                                                                    512 bytes
-		                   //
-		                   //                                                                  Tras enviar los dos mensajes, se cierra la
-		                   //                                                                  conexión.
-		                   //                                                                      Entonces, cuando el cliente lee y el servidor
-		                   //                                                                  escribe (modo READ), el servidor debe comprobar
-		                   //                                                                  cuando alcanza EOF y cerrar la conexión después.
-		                   //                                                                  En el caso en que el cliente escribe y el servidor
-		                   //                                                                  lee (modo WRITE), el cliente debe comprobar cuando
-		                   //                                                                  alcanza EOF y terminar de enviar ahi. En ambos
-		                   //                                                                  casos el receptor debe detectar el ultimo mensaje
-		                   //                                                                  (que tiene menos de 512 bytes).
+
+		switch(msg_type) { 
 		case READ_TYPE:
 		    
 		    memcpy((void *)&rw_msg, (const void *)&buf, sizeof(rw_msg));
@@ -453,36 +413,11 @@ printmtof("Aqui esperando al CLIENT ",
 		     * 3- Enviar datos
 		     */
 		     
-		     if ((ptr = fopen(rw_msg.filename, "r")) == NULL) {
-		        printmtof("servidor.c: serverTCP: READ_TYPE: could not open file to read: ",
-		                  "debug.txt");
-		        printmtof(rw_msg.filename, "debug.txt");
-		        return;
-		     }
-		     
-		     if (0 != fseek(ptr, nreadbytes, SEEK_SET)) {
-		        printmtof("servidor.c: serverTCP: READ_TYPE: error in fseek",
-		                  "debug.txt");
-		        return;
-		     }
-		     
-		     if (1 != fread((void *)&(data_msg->data), sizeof(data_msg->data), 1, ptr)){
-			     if (ferror(ptr)) {
-			        printmtof("servidor.c: serverTCP: READ_TYPE: error in fread",
+		     if ((last_block = read_from_file(data_msg, rw_msg.filename, nreadbytes)) == -1){
+                    printmtof("servidor.c: serverTCP: READ_TYPE: error in read_from_file",
 			                  "debug.txt");
 			        return;
-			     } else if (feof(ptr)) {
-			        last_block = data_msg->n_block;
-			     }
-		     }
-		     
-		     if (0 != fclose(ptr)){
-		         printmtof("servidor.c: serverTCP: READ_TYPE: error in fclose",
-	                          "debug.txt");
-	             return;
-		     }
-		     
-		     ptr = NULL;
+             }
 		     
 		     memcpy((void *)buf, (const void *)data_msg, sizeof(*data_msg));
 		     strncpy(filename,(const char*) &(rw_msg.filename), sizeof(filename));
@@ -490,136 +425,91 @@ printmtof("Aqui esperando al CLIENT ",
 		     nreadbytes += TFTP_DATA_SIZE;
 		break;
 		case WRITE_TYPE:
-		     printmtof("Entro en WriteType",
-	                          "debug.txt");
+
 		     memcpy((void *)&rw_msg, (const void *)&buf, sizeof(rw_msg));
 		     strncpy(filename,(const char*) &(rw_msg.filename), sizeof(filename));
+		     
 		    /*
 		     * 1- Enviar ACK (n = 0)
 		     */
 
 		     ack_msg_send = create_ack_msg(0);
-
 		     memcpy((void *)buf, (const void *)ack_msg_send, sizeof(*ack_msg_send));
-		     printmtof("Acabo en WriteType",
-	                          "debug.txt");
 		     
 		break;
 		case ACK_TYPE:
 			
 		    memcpy((void *)&ack_msg, (const void *)&buf, sizeof(ack_msg));
 		    
-		    char prueba[100];
-		    sprintf(prueba,"LastBlock (%d) Ack_msgBlock (%d)\n",last_block, ack_msg.n_block );
-		    printmtof(prueba,
-		                  "debug.txt");
 		    if (0 != last_block && last_block == ack_msg.n_block){
 			    printmtof("GOTO ",
 		                  "debug.txt");
 		        goto END_OF_FILE;
 		    }
 		    
-		    //rreqcnt = ack_msg.n_block + 1;
 		    data_msg = create_data_msg(ack_msg.n_block + 1);
 		
 		    /*
 		     * Para el ACK X:
 		     *      1- Enviar bloque X + 1
 		     */
-		     printmtof("Abro el fichero ",
-		                  "debug.txt");
-		     if ((ptr = fopen(filename, "r")) == NULL) {
-		        printmtof("servidor.c: serverTCP: ACK_TYPE: could not open file to read",
-		                  "debug.txt");
-		        return;
-		     }
-		     
-		     printmtof("Me situo en la posicion: ",
-		                  "debug.txt");
-		     sprintf(prueba,"%d\n",nreadbytes);
-		     printmtof(prueba,
-		                  "debug.txt");
-		     if (0 != fseek(ptr, nreadbytes, SEEK_SET)) {
-		        printmtof("servidor.c: serverTCP: ACK_TYPE: error in fseek",
-		                  "debug.txt");
-		        return;
-		     }
-		    
-		     printmtof("Me pongo a leer: ",
-		                  "debug.txt");
-		     if (1 != fread((void *)&(data_msg->data), sizeof(data_msg->data), 1, ptr)){
-			     if (ferror(ptr)) {
-			        printmtof("servidor.c: serverTCP: ACK_TYPE: error in fread",
+
+		     if ((last_block = read_from_file(data_msg, filename, nreadbytes)) == -1){
+                    printmtof("servidor.c: serverTCP: ACK_TYPE: error in read_from_file",
 			                  "debug.txt");
 			        return;
-			     } else if (feof(ptr)) {
-				printmtof("Reached END OF FILE (MANDO BLOQUE VACIO): ",
-				          "debug.txt");
-			        last_block = data_msg->n_block;
-			     }
-		     }
-		     
-		     if (0 != fclose(ptr)){
-		         printmtof("servidor.c: serverTCP: ACK_TYPE: error in fclose",
-	                          "debug.txt");
-	             return;
-		     }
-		     
-		     ptr = NULL;
-		     printmtof("VOY A ENVIAR EL MALDITO MENSAJE ",
-		                  "debug.txt");
+             }
+             
 		     memcpy((void *)buf, (const void *)data_msg, sizeof(*data_msg));
 		     nreadbytes += TFTP_DATA_SIZE;
 
 		break;
 		case DATA_TYPE:
-		    printmtof("Entro en DataType",
-	                          "debug.txt");
-		    memcpy((void *)&data_msg_rcv, (const void *)&buf, sizeof(data_msg_rcv));
 
-		    if (0 == strlen(data_msg_rcv.data)){
-			printmtof("GOTO ",
-		                  "debug.txt");
-		        goto END_OF_FILE;
-		    }
+		    memcpy((void *)&data_msg_rcv, (const void *)&buf, sizeof(data_msg_rcv));
+		    
 		    /*
 		     * Para el bloque X
 		     *      1- Escribir DATA X
 		     *      2- Mandar ACK (n = X)
 		     */
 		     
-		     if ((ptr = fopen(filename, "a")) == NULL) {
-		        printmtof("servidor.c: serverTCP: DATA_TYPE: could not open file to read\n",
-	                          "debug.txt");
-		        return;
-		     }
-		     
-		     if (0 != fseek(ptr, nwrittenbytes, SEEK_SET)) {
-		        printmtof("servidor.c: serverTCP: DATA_TYPE: error in fseek\n",
-	                          "debug.txt");
-		        return;
-		     }
-		     
-		     if (1 != fwrite((void *)&(data_msg_rcv.data), sizeof(data_msg_rcv.data), 1, ptr)){
-	             	printmtof("servidor.c: serverTCP: DATA_TYPE: error in fwrite\n",
-	                          "debug.txt");
-	             	return;
-		     }
-
-		     if (0 != fclose(ptr)){
-		         printmtof("servidor.c: serverTCP: DATA_TYPE: error in fclose\n",
-	                          "debug.txt");
-	             	 return;
-		     }
-
-        	     ptr = NULL;
-		     
-		     ack_msg_send = create_ack_msg(data_msg_rcv.n_block);
-
-		     memcpy((void *)buf, (const void *)ack_msg_send, sizeof(*ack_msg_send));
-
-		     nwrittenbytes += TFTP_DATA_SIZE;
-		     printmtof("Salgo de DataType",
+		     if (TFTP_DATA_SIZE == strlen(data_msg_rcv.data)) {	
+		        
+		         if ((write_data_into_file(data_msg_rcv, filename, nwrittenbytes)) == -1){
+                    printmtof("servidor.c: serverTCP: DATA_TYPE: data = 512: error in write_data_into_file",
+			                  "debug.txt");
+			        return;
+                 }
+		         
+		         ack_msg_send = create_ack_msg(data_msg_rcv.n_block);
+		         memcpy((void *)buf, (const void *)ack_msg_send, sizeof(*ack_msg_send));
+		         nwrittenbytes += TFTP_DATA_SIZE;
+		         
+		      } else if (TFTP_DATA_SIZE > strlen(data_msg_rcv.data)) {
+            	 
+            	 if ((write_data_into_file(data_msg_rcv, filename, nwrittenbytes)) == -1){
+                    printmtof("servidor.c: serverTCP: DATA_TYPE: data < 512: error in write_data_into_file",
+			                  "debug.txt");
+			        return;
+                 }
+            	 
+            	 ack_msg_send = create_ack_msg(data_msg_rcv.n_block);
+	             memcpy((void *)buf, (const void *)ack_msg_send, sizeof(*ack_msg_send));
+		         nwrittenbytes += strlen(data_msg_rcv.data);
+		         printmtof("GOTO menos que 52 ",
+		                          "debug.txt");
+		         eof_flag = 1;
+		         
+		      } else if (0 == strlen(data_msg_rcv.data)) {
+		             
+		         ack_msg_send = create_ack_msg(data_msg_rcv.n_block);
+	             memcpy((void *)buf, (const void *)ack_msg_send, sizeof(*ack_msg_send));
+                 printmtof("GOTO igual a 0 ",
+		                          "debug.txt");
+		         eof_flag = 1;
+		      }
+		      printmtof("Salgo de DataType",
 	                          "debug.txt");
 		break;
 		case ERROR_TYPE:
@@ -636,52 +526,24 @@ printmtof("Aqui esperando al CLIENT ",
 		break;
 		}
 		
-		/*
-		snprintf(str, sizeof(str),
-		         "(READ: \'%d\' bytes)\n\
-HEMOS ENCONTRAO\' UN STRUCT:\n\
-\t- Message type: \'%d\'\n\
-\t- Filename: \'%s\'\n\
-\t- Mode: \'%s\'\n",
-		         len, rw_msg.msg_type, rw_msg.filename, rw_msg.mode);
-
-		printmtof(str, "read.txt"); // JAJA
-		*/
-		
-			/* Increment the request count. */
 		reqcnt++;
 		msg_type = 0;
-			/* This sleep simulates the processing of the
-			 * request that a real server might do.
-			 */
+
 		sleep(1);
-		printmtof("Servidor Envia el mensaje al cliente",
-		                  "debug.txt");
+
 			/* Send a response back to the client. */
 		if (send(s, buf, TAM_BUFFER, 0) != TAM_BUFFER) errout(hostname);
+		
+		if (eof_flag)
+		    goto END_OF_FILE;
 	}
 
 END_OF_FILE:
-		/* The loop has terminated, because there are no
-		 * more requests to be serviced.  As mentioned above,
-		 * this close will block until all of the sent replies
-		 * have been received by the remote host.  The reason
-		 * for lingering on the close is so that the server will
-		 * have a better idea of when the remote has picked up
-		 * all of the data.  This will allow the start and finish
-		 * times printed in the log file to reflect more accurately
-		 * the length of time this connection was used.
-		 */
+
 	close(s);
 
-		/* Log a finishing message. */
 	time (&timevar);
-		/* The port number must be converted first to host byte
-		 * order before printing.  On most hosts, this is not
-		 * necessary, but the ntohs() call is included here so
-		 * that this program could easily be ported to a host
-		 * that does require it.
-		 */
+
 	printf("Completed %s port %u, %d requests, at %s\n",
 		hostname, ntohs(clientaddr_in.sin_port), reqcnt, (char *) ctime(&timevar));
 }
