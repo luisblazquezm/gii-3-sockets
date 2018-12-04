@@ -1,19 +1,36 @@
 Aqui esperando al CLIENT 
 LLega hasta el servidor. OK 
-Msg_type es 2
+Msg_type es 1
 
-Entro en WriteType
-Acabo en WriteType
 Servidor Envia el mensaje al cliente
 LLega hasta el servidor. OK 
-Msg_type es 3
+Msg_type es 4
 
-Entro en DataType
-Salgo de DataType
+LastBlock (0) Ack_msgBlock (1)
+
+Abro el fichero 
+Me situo en la posicion: 
+512
+
+Me pongo a leer: 
+VOY A ENVIAR EL MALDITO MENSAJE 
 Servidor Envia el mensaje al cliente
 LLega hasta el servidor. OK 
-Msg_type es 3
+Msg_type es 4
 
-Entro en DataType
-Salgo de DataType
+LastBlock (0) Ack_msgBlock (2)
+
+Abro el fichero 
+Me situo en la posicion: 
+1024
+
+Me pongo a leer: 
+Reached END OF FILE (MANDO BLOQUE VACIO): 
+VOY A ENVIAR EL MALDITO MENSAJE 
 Servidor Envia el mensaje al cliente
+LLega hasta el servidor. OK 
+Msg_type es 4
+
+LastBlock (3) Ack_msgBlock (3)
+
+GOTO 

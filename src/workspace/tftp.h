@@ -1,6 +1,8 @@
 #ifndef __TFTP_H
 #define __TFTP_H
 
+#include <inttypes.h>
+
 #define WRONG_MSG_TYPE  -1
 
 #define NETASCII_MODE	0

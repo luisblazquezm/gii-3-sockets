@@ -77,7 +77,7 @@ char *argv[];
 		fprintf(stderr, "Usage:  %s %s <[r|w] request>\n", argv[0], argv[1]);
 		exit(1);
 	} else if (argc == 3) {
-		tcp_mode = WRITE_TYPE; //<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< Lo tengo por defecto puesto en modo lectura
+		tcp_mode = READ_TYPE; //<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< Lo tengo por defecto puesto en modo lectura
 /*
 		if (strcmp(argv[2],"r")){
 			tcp_mode = READ_TYPE;
@@ -253,13 +253,13 @@ char *argv[];
 		     }
 		     
 		     if (1 != fread((void *)&(data_msg_rcv->data), sizeof(data_msg_rcv->data), 1, ptr)){
-                if (ferror(ptr)) {
-                    fprintf(stderr,"cliente.c: ACK_TYPE: error in fread");
-                    return -1;
-                } else if (feof(ptr)) {
-                    fprintf(stderr,"Reached END OF FILE\n");
-                    eof_flag = 1; // <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< // Flag set
-                }
+		        if (ferror(ptr)) {
+		            fprintf(stderr,"cliente.c: ACK_TYPE: error in fread");
+		            return -1;
+		        } else if (feof(ptr)) {
+		            fprintf(stderr,"Reached END OF FILE\n");
+		            eof_flag = 1; // <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< // Flag set
+		        }
 		     }
 		     
 		     if (0 != fclose(ptr)){
@@ -281,7 +281,9 @@ char *argv[];
 		     }
 		     
 		     if (eof_flag){
-		        goto END_OF_TRANSMISSION; // <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+		        time(&timevar);
+			    printf("All done at %s", (char *) ctime(&timevar));
+			    return 0;
 		     }
 
 		
@@ -295,40 +297,101 @@ char *argv[];
 		     *      1- Escribir DATA X
 		     *      2- Mandar ACK (n = X)
 		     */
-		     
-		     if ((ptr = fopen(wfilename, "a")) == NULL) {
-		        printf("clientcp.c: DATA_TYPE: could not open file to read\n");
-		        return -1;
-		     }
-		     
-		     if (0 != fseek(ptr, nwrittenbytes, SEEK_SET)) {
-		        printf("clientcp.c: DATA_TYPE: error in fseek\n");
-		        return -1;
-		     }
-		     
-		     if (1 != fwrite((void *)&(data_msg.data), sizeof(data_msg.data), 1, ptr)){
-	             	printf("clientcp.c: DATA_TYPE: error in fwrite\n");
-	             	return -1;
-		     }
+            if (TFTP_DATA_SIZE == strlen(data_msg.data)) {		     
 
-		     if (0 != fclose(ptr)){
-		         printf("clientcp.c: DATA_TYPE: error in fclose\n");
-	             	 return -1;
-		     }
-        	     ptr = NULL;
-		     
-		     printf("Received block number %d\n", data_msg.n_block);
-		     
-		     ack_msg = create_ack_msg(data_msg.n_block);
+                if ((ptr = fopen(wfilename, "a")) == NULL) {
+                    printf("clientcp.c: DATA_TYPE: could not open file to read\n");
+                    return -1;
+                }
 
-		     memcpy((void *)buf, (const void *)ack_msg, sizeof(*ack_msg));
+                if (0 != fseek(ptr, nwrittenbytes, SEEK_SET)) {
+                    printf("clientcp.c: DATA_TYPE: error in fseek\n");
+                    return -1;
+                }
 
-		     nwrittenbytes += TFTP_DATA_SIZE;
+                if (1 != fwrite((void *)&(data_msg.data), sizeof(data_msg.data), 1, ptr)){
+                    printf("clientcp.c: DATA_TYPE: error in fwrite\n");
+                    return -1;
+                }
 
-		     if (send(s, buf, TAM_BUFFER, 0) != TAM_BUFFER){
-		        printf("clientcp.c: DATA_TYPE: error in send\n");
+                if (0 != fclose(ptr)){
+                    printf("clientcp.c: DATA_TYPE: error in fclose\n");
+                    return -1;
+                }
+                ptr = NULL;
+
+                printf("Received block number %d\n", data_msg.n_block);
+
+                ack_msg = create_ack_msg(data_msg.n_block);
+
+                memcpy((void *)buf, (const void *)ack_msg, sizeof(*ack_msg));
+
+                nwrittenbytes += TFTP_DATA_SIZE;
+                
+                if (send(s, buf, TAM_BUFFER, 0) != TAM_BUFFER){
+		            printf("clientcp.c: DATA_TYPE: error in send\n");
 	                return -1;
-		     }
+		        }
+                
+            } else if (TFTP_DATA_SIZE > strlen(data_msg.data)) {
+            
+                if ((ptr = fopen(wfilename, "a")) == NULL) {
+                    printf("clientcp.c: DATA_TYPE: could not open file to read\n");
+                    return -1;
+                }
+
+                if (0 != fseek(ptr, nwrittenbytes, SEEK_SET)) {
+                    printf("clientcp.c: DATA_TYPE: error in fseek\n");
+                    return -1;
+                }
+
+                if (1 != fwrite((void *)&(data_msg.data), sizeof(data_msg.data), 1, ptr)){
+                    printf("clientcp.c: DATA_TYPE: error in fwrite\n");
+                    return -1;
+                }
+
+                if (0 != fclose(ptr)){
+                    printf("clientcp.c: DATA_TYPE: error in fclose\n");
+                    return -1;
+                }
+                ptr = NULL;
+
+                printf("Received block number %d\n", data_msg.n_block);
+
+                ack_msg = create_ack_msg(data_msg.n_block);
+
+                memcpy((void *)buf, (const void *)ack_msg, sizeof(*ack_msg));
+
+                nwrittenbytes += strlen(data_msg.data);
+                
+                if (send(s, buf, TAM_BUFFER, 0) != TAM_BUFFER){
+		            printf("clientcp.c: DATA_TYPE: error in send\n");
+	                return -1;
+		        }
+		        
+		        time(&timevar);
+	            printf("All done at %s", (char *) ctime(&timevar));
+	            return 0;
+		         
+            } else if (0 == strlen(data_msg.data)) {
+            
+                printf("Received block number %d\n", data_msg.n_block);
+
+                ack_msg = create_ack_msg(data_msg.n_block);
+
+                memcpy((void *)buf, (const void *)ack_msg, sizeof(*ack_msg));
+                
+                if (send(s, buf, TAM_BUFFER, 0) != TAM_BUFFER){
+	                printf("clientcp.c: DATA_TYPE: error in send\n");
+                    return -1;
+	            }
+	            
+	            time(&timevar);
+                printf("All done at %s", (char *) ctime(&timevar));
+                return 0;
+            }
+
+		     
 
 		break;
 		case ERROR_TYPE:
@@ -348,9 +411,8 @@ char *argv[];
 		//printf("Received result number %d\n", *buf);
 	}
 
-END_OF_TRANSMISSION:
-
     /* Print message indicating completion of task. */
 	time(&timevar);
 	printf("All done at %s", (char *) ctime(&timevar));
+	return 0;
 }

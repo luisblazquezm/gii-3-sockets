@@ -303,7 +303,7 @@ void serverTCP(int s, struct sockaddr_in clientaddr_in)
      char str[1000];
      short msg_type = 0;
      FILE *ptr = NULL;
-     int last_block = -1;
+     int last_block = 0;
    /*******************************************************************/
 
 
@@ -467,15 +467,13 @@ printmtof("Aqui esperando al CLIENT ",
 		     }
 		     
 		     if (1 != fread((void *)&(data_msg->data), sizeof(data_msg->data), 1, ptr)){
-	             if (ferror(ptr)) {
-	                printmtof("servidor.c: serverTCP: READ_TYPE: error in fread",
-	                          "debug.txt");
-	                return;
-	             } else if (feof(ptr)) {
-	                if (0 == strlen(data_msg->data)) {
-	                    last_block = data_msg->n_block;
-	                }
-	             }
+			     if (ferror(ptr)) {
+			        printmtof("servidor.c: serverTCP: READ_TYPE: error in fread",
+			                  "debug.txt");
+			        return;
+			     } else if (feof(ptr)) {
+			        last_block = data_msg->n_block;
+			     }
 		     }
 		     
 		     if (0 != fclose(ptr)){
@@ -511,8 +509,12 @@ printmtof("Aqui esperando al CLIENT ",
 			
 		    memcpy((void *)&ack_msg, (const void *)&buf, sizeof(ack_msg));
 		    
+		    char prueba[100];
+		    sprintf(prueba,"LastBlock (%d) Ack_msgBlock (%d)\n",last_block, ack_msg.n_block );
+		    printmtof(prueba,
+		                  "debug.txt");
 		    if (0 != last_block && last_block == ack_msg.n_block){
-			printmtof("GOTO ",
+			    printmtof("GOTO ",
 		                  "debug.txt");
 		        goto END_OF_FILE;
 		    }
@@ -553,10 +555,7 @@ printmtof("Aqui esperando al CLIENT ",
 			     } else if (feof(ptr)) {
 				printmtof("Reached END OF FILE (MANDO BLOQUE VACIO): ",
 				          "debug.txt");
-			        if (0 == strlen(data_msg->data)) {
-			            goto END_OF_FILE;
-			        }
-			        return;
+			        last_block = data_msg->n_block;
 			     }
 		     }
 		     

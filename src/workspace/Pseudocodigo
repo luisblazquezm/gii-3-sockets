@@ -1,0 +1,12 @@
+Si (tamaño = 512) {
+	Escribir()
+	MandarACK()
+	Esperar()
+} Si no, si (tamaño < 512) {
+	Escribir()
+	MandarAcK()
+	CerrarConexion()
+} Si no, si (tamaño = 0) {
+	MandarACK()
+	CerrarConexion()
+}
