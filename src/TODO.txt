@@ -1,0 +1,2 @@
+========================== DUDAS ===============================
+-¿Se debe enviar el buffer entero cuando se comunican cliente y servidor?

@@ -49,10 +49,11 @@ char *argv[];
 	int addrlen, i, j, errcode;
     /* This example uses TAM_BUFFER byte messages. */
 	char buf[TAM_BUFFER];
-	int eof_flag;
+	
 	
 	/* VARIABLES UTILIZADAS POR NOSOTROS */
 	
+	int eof_flag;
 	char rfilename[] = "thisispdf.txt"; /* Esto luego será argv[4] */
 	char wfilename[] = "fichero1.txt";  /* Esto luego será argv[4] */
 	int nwrittenbytes = 0; /* Keeps the number of bytes written in a file */
@@ -60,7 +61,7 @@ char *argv[];
 	char str[1000];
 	short msg_type = 0;
 	int tcp_mode = -1; /* Esto luego será argv[3] */
-        int last_block = -1;
+    int last_block = -1;
 	FILE *ptr = NULL;
 	// Mensajes de emisión
 	rw_msg_t *rw_msg = NULL;
@@ -271,7 +272,7 @@ char *argv[];
 		     
 		break;
 		default:
-		    printf("clientcp: Invalid type of message\n");
+		    printf("clientcp: default: Invalid type of message\n");
 		    return -1;
 		break;
 		}

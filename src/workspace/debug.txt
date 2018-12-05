@@ -1,0 +1,11 @@
+El tamaño de esta huea es 512
+
+Salgo de DataType
+El tamaño de esta huea es 512
+
+Salgo de DataType
+El tamaño de esta huea es 269
+
+GOTO menos que 52 
+Salgo de DataType
+Enviando mensaje al Cliente

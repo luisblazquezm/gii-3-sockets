@@ -166,12 +166,12 @@ int write_data_into_file(data_msg_t data_msg, char *filename, int pos)
         return -1;
     }
     
-    return 0;
+    return 0; // No pongas 1 porque luego no funciona porque coincide con el ACK mandado 
 }
 
 FILE* open_file(char *filename, char *file_mode)
 {
-    FILE *f = NULL;
+    FILE *f;
     
     if ((f = fopen(filename, file_mode)) == NULL) {
         fprintf(stderr,"tftp.c: create_file: could not open file to read\n");
@@ -189,6 +189,6 @@ int locate_in_file_position(FILE *f, int pos)
         return -1;
     }
     
-    return 0;
+    return 1;
 }
 

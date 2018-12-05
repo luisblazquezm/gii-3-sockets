@@ -16,8 +16,8 @@ servidor: servidor.o debugging.o tftp.o debugging.h tftp.h
 clientcp: clientcp.o tftp.o tftp.h
 	${CC} ${CFLAGS} -o $@ clientcp.o tftp.o tftp.h ${LIBS}
 
-clientudp: clientudp.o
-	${CC} ${CFLAGS} -o $@ clientudp.o ${LIBS}
+clientudp: clientudp.o tftp.o tftp.h
+	${CC} ${CFLAGS} -o $@ clientudp.o tftp.o tftp.h ${LIBS}
 
 exe: servidor clientcp
 	./servidor; ./clientcp 127.0.0.1
