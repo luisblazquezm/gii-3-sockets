@@ -1,10 +1,10 @@
 /*
- *          		S E R V I D O R
- *
- *	This is an example program that demonstrates the use of
- *	sockets TCP and UDP as an IPC mechanism.  
- *
- */
+** Fichero: servidor.c
+** Autores:
+** Luis Blázquez Miñambres DNI 70910465Q
+** Samuel Gómez Sánchez    DNI 45136357F
+*/
+
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <sys/errno.h>
@@ -18,26 +18,18 @@
 #include <time.h>
 #include <unistd.h>
 #include "tftp.h"
-#include "debugging.h"
+#include "log.h"
 
 
 #define PUERTO 6357
-#define ADDRNOTFOUND	0xffffffff	/* return address for unfound host */
-#define BUFFERSIZE	1024	/* maximum size of packets to be received */
+#define ADDRNOTFOUND	0xffffffff	
+#define BUFFERSIZE	1024	
 #define TAM_BUFFER 1024
 #define MAXHOST 128
 
 extern int errno;
 
-/*
- *			M A I N
- *
- *	This routine starts the server.  It forks, leaving the child
- *	to do all the work, so it does not have to be run in the
- *	background.  It sets up the sockets.  It
- *	will loop forever, until killed by a signal.
- *
- */
+char debug_file[] = "debug.txt";
  
 void serverTCP(int s, struct sockaddr_in peeraddr_in);
 void serverUDP(int s, char * buffer, struct sockaddr_in clientaddr_in);
@@ -51,51 +43,48 @@ int argc;
 char *argv[];
 {
 
-    int s_TCP, s_UDP;		/* connected socket descriptor */
-    int ls_TCP;				/* listen socket descriptor */
+    int s_TCP, s_UDP;		
+    int ls_TCP;				
     
-    int cc;				    /* contains the number of bytes read */
+    int cc;				   
      
-    struct sigaction sa = {.sa_handler = SIG_IGN}; /* used to ignore SIGCHLD */
+    struct sigaction sa = {.sa_handler = SIG_IGN}; 
     
-    struct sockaddr_in myaddr_in;	/* for local socket address */
-    struct sockaddr_in clientaddr_in;	/* for peer socket address */
+    struct sockaddr_in myaddr_in;	
+    struct sockaddr_in clientaddr_in;	
 	int addrlen;
 	
     fd_set readmask;
     int numfds,s_mayor;
     
-    char buffer[BUFFERSIZE];	/* buffer for packets to be read into */
+    char buffer[BUFFERSIZE];	
     
     struct sigaction vec;
     
     int udp_value = 0;
+    
+    
+    int u_UDP;
+    struct sockaddr_in servaddr_in;
+    struct addrinfo hints, *res;
+    
+    long errcode;
+    
 
-		/* Create the listen socket. */
+    /* Create the listen socket. */
 	ls_TCP = socket (AF_INET, SOCK_STREAM, 0);
 	if (ls_TCP == -1) {
 		perror(argv[0]);
 		fprintf(stderr, "%s: unable to create socket TCP\n", argv[0]);
 		exit(1);
 	}
-	/* clear out address structures */
+
 	memset ((char *)&myaddr_in, 0, sizeof(struct sockaddr_in));
    	memset ((char *)&clientaddr_in, 0, sizeof(struct sockaddr_in));
 
     addrlen = sizeof(struct sockaddr_in);
 
-		/* Set up address structure for the listen socket. */
 	myaddr_in.sin_family = AF_INET;
-		/* The server should listen on the wildcard address,
-		 * rather than its own internet address.  This is
-		 * generally good practice for servers, because on
-		 * systems which are connected to more than one
-		 * network at once will be able to have one server
-		 * listening on all networks at once.  Even when the
-		 * host is connected to only one network, this is good
-		 * practice, because it makes the server program more
-		 * portable.
-		 */
 	myaddr_in.sin_addr.s_addr = INADDR_ANY;
 	myaddr_in.sin_port = htons(PUERTO);
 
@@ -105,16 +94,12 @@ char *argv[];
 		fprintf(stderr, "%s: unable to bind address TCP\n", argv[0]);
 		exit(1);
 	}
-		/* Initiate the listen on the socket so remote users
-		 * can connect.  The listen backlog is set to 5, which
-		 * is the largest currently supported.
-		 */
+	
 	if (listen(ls_TCP, 5) == -1) {
 		perror(argv[0]);
 		fprintf(stderr, "%s: unable to listen on socket\n", argv[0]);
 		exit(1);
 	}
-	
 	
 	/* Create the socket UDP. */
 	s_UDP = socket (AF_INET, SOCK_DGRAM, 0);
@@ -122,28 +107,28 @@ char *argv[];
 		perror(argv[0]);
 		printf("%s: unable to create socket UDP\n", argv[0]);
 		exit(1);
-	   }
+	}
+	   
 	/* Bind the server's address to the socket. */
 	if (bind(s_UDP, (struct sockaddr *) &myaddr_in, sizeof(struct sockaddr_in)) == -1) {
 		perror(argv[0]);
 		printf("%s: unable to bind address UDP\n", argv[0]);
 		exit(1);
-	    }
+	}
 
-		/* Now, all the initialization of the server is
-		 * complete, and any user errors will have already
-		 * been detected.  Now we can fork the daemon and
-		 * return to the user.  We need to do a setpgrp
-		 * so that the daemon will no longer be associated
-		 * with the user's control terminal.  This is done
-		 * before the fork, so that the child will not be
-		 * a process group leader.  Otherwise, if the child
-		 * were to open a terminal, it would become associated
-		 * with that terminal as its control terminal.  It is
-		 * always best for the parent to do the setpgrp.
-		 */
-	setpgrp();
-
+    /*
+     *     Más allá de la simple estructura padre - hijo, el sistema operativo
+     * Unix organiza los procesos en sesiones (para poder, por ejemplo, termi-
+     * nar con todos los procesos de un usuario) y grupos (construidos como
+     * "procesos relacionados" en algún sentido).
+     *     Las llamadas setpgid() y getpgrp() permiten modificar el ID de grupo
+     * de un proceso; mientras que la primera permite cambiar el ID a uno de 
+     * cualquier proceso, setpgrp() establece al que la llama como lider de su
+     * grupo.
+    */
+	setpgrp(); // Eliminamos la relación entre el proceso en ejecución y la
+	           // terminal. Ejecución en el fondo: daemon
+    
 	switch (fork()) {
 	case -1:		/* Unable to fork, for some reason. */
 		perror(argv[0]);
@@ -152,31 +137,21 @@ char *argv[];
 
 	case 0:     /* The child process (daemon) comes here. */
 
-			/* Close stdin and stderr so that they will not
-			 * be kept open.  Stdout is assumed to have been
-			 * redirected to some logging file, or /dev/null.
-			 * From now on, the daemon will not report any
-			 * error messages.  This daemon will loop forever,
-			 * waiting for connections and forking a child
-			 * server to handle each one.
-			 */
 		fclose(stdin);
 		fclose(stderr);
 
-			/* Set SIGCLD to SIG_IGN, in order to prevent
-			 * the accumulation of zombies as each child
-			 * terminates.  This means the daemon does not
-			 * have to make wait calls to clean them up.
-			 */
+        // CREATE LOG FILE
+        init_log_file(LOG_FILENAME); 
+
 		if (sigaction(SIGCHLD, &sa, NULL) == -1) {
             perror(" sigaction(SIGCHLD)");
             fprintf(stderr,"%s: unable to register the SIGCHLD signal\n", argv[0]);
             exit(1);
-            }
+        }
             
-		    /* Registrar SIGTERM para la finalizacion ordenada del programa servidor */
         vec.sa_handler = (void *) finalizar;
         vec.sa_flags = 0;
+        
         if (sigaction(SIGTERM, &vec, (struct sigaction *) 0) == -1) {
             perror(" sigaction(SIGTERM)");
             fprintf(stderr,"%s: unable to register the SIGTERM signal\n", argv[0]);
@@ -184,65 +159,57 @@ char *argv[];
         }
 
 		while (!FIN) {
-            /* Meter en el conjunto de sockets los sockets UDP y TCP */
+            
             FD_ZERO(&readmask);
             FD_SET(ls_TCP, &readmask);
             FD_SET(s_UDP, &readmask);
-            /* 
-            Seleccionar el descriptor del socket que ha cambiado. Deja una marca en 
-            el conjunto de sockets (readmask)
-            */ 
+           
     	    if (ls_TCP > s_UDP) s_mayor=ls_TCP;
     		else s_mayor=s_UDP;
 
+            /*
+             * select() utiliza objetos de tipo fd_set para esperar a que 
+             * varios conjuntos de descriptores de fichero cambien de estado.
+             *     Como primer parámetro se le debe pasar el descriptor de
+             * fichero de mayor número, para que al buscar busque sólo hasta
+             * ese límite.
+             *     Además, cuenta con un timeout de tipo struct timeval. La
+             * llamada a select quedará bloqueada hasta que:
+             *     - Un descriptor de fichero esté preparado
+             *     - Una llamada a signal handler la interrumpa
+             *     - Expire el timeout
+            */
             if ( (numfds = select(s_mayor+1, &readmask, (fd_set *)0, (fd_set *)0, NULL)) < 0) {
                 if (errno == EINTR) {
                     FIN=1;
 		            close (ls_TCP);
 		            close (s_UDP);
-                    perror("\nFinalizando el servidor. SeÃal recibida en elect\n "); 
+                    perror("\nFinalizando el servidor. Señal recibida en select\n "); 
                 }
             } else { 
 
                     /* Comprobamos si el socket seleccionado es el socket TCP */
                     if (FD_ISSET(ls_TCP, &readmask)) {
-
                         s_TCP = accept(ls_TCP, (struct sockaddr *) &clientaddr_in, &addrlen);
-                        if (s_TCP == -1) exit(1);
+                        
+                        if (s_TCP == -1){
+                            exit(1);
+                        }
+                        
                         switch (fork()) {
                             case -1:	/* Can't fork, just exit. */
                                 exit(1);
                             case 0:		/* Child process comes here. */
-                                close(ls_TCP); /* Close the listen socket inherited from the daemon. */
+                                close(ls_TCP); 
                                 serverTCP(s_TCP, clientaddr_in);
                                 exit(0);
                             default:	/* Daemon process comes here. */
-                                /* The daemon needs to remember
-                                * to close the new accept socket
-                                * after forking the child.  This
-                                * prevents the daemon from running
-                                * out of file descriptor space.  It
-                                * also means that when the server
-                                * closes the socket, that it will
-                                * allow the socket to be destroyed
-                                * since it will be the last close.
-                                */
                                 close(s_TCP);
                         }
                     } /* De TCP*/
                 
                     /* Comprobamos si el socket seleccionado es el socket UDP */
                     if (FD_ISSET(s_UDP, &readmask)) {
-                        /* This call will block until a new
-                        * request arrives.  Then, it will
-                        * return the address of the client,
-                        * and a buffer containing its request.
-                        * BUFFERSIZE - 1 bytes are read so that
-                        * room is left at the end of the buffer
-                        * for a null character.
-                        */
-                        printmtof("ESPERO AL RECV_FROM",
-                            "debug.txt");
                         cc = recvfrom(s_UDP, buffer, TAM_BUFFER - 1, 0,
                             (struct sockaddr *)&clientaddr_in, &addrlen);
                         if (cc == -1) {
@@ -256,45 +223,47 @@ char *argv[];
                         */
                         buffer[cc]='\0';
                         
+                        //serverUDP(s_UDP, buffer, clientaddr_in);
+                        char host_name[100];
+                        
                         switch (fork()) {
-                            case -1:	/* Can't fork, just exit. */
+                            case -1:	
                                 exit(1);
-                            case 0:		/* Child process comes here. */
+                            case 0:
                             
-                                close(s_UDP); /* Close the listen socket inherited from the daemon. */
-                                
-                                /* Create a new socket for the child. */
-	                            s_UDP = socket (AF_INET, SOCK_DGRAM, 0);
-	                            if (s_UDP == -1) {
+                                memset (&myaddr_in, 0, sizeof(struct sockaddr_in));
+	                            memset (&servaddr_in, 0, sizeof(struct sockaddr_in));
+	
+	                            myaddr_in.sin_family = AF_INET;
+	                            myaddr_in.sin_port = 0;
+	                            myaddr_in.sin_addr.s_addr = INADDR_ANY;
+
+	                            u_UDP = socket (AF_INET, SOCK_DGRAM, 0);
+	                            if (u_UDP == -1) {
 		                            perror(argv[0]);
 		                            printf("%s: unable to create child\'s UDP socket\n", argv[0]);
 		                            exit(1);
-	                            }
-	                            /* Bind the child's address to the socket. Configuration correctly 
-	                             * inherited from father after fork
-	                             */
-	                            if (bind(s_UDP, (struct sockaddr *) &myaddr_in, sizeof(struct sockaddr_in)) == -1) {
+	                            } 
+	                            
+	                            if (bind(u_UDP, (struct sockaddr *) &myaddr_in, sizeof(struct sockaddr_in)) == -1) {
 		                            perror(argv[0]);
 		                            printf("%s: unable to bind address UDP\n", argv[0]);
 		                            exit(1);
 	                            }
+	                            
+	                            addrlen = sizeof(struct sockaddr_in);
+                                if (getsockname(u_UDP, (struct sockaddr *)&myaddr_in, &addrlen) == -1) {
+                                        perror(argv[0]);
+                                        fprintf(stderr, "%s: unable to read socket address\n", argv[0]);
+                                        exit(1);
+                                }
                                 
-                                serverUDP(s_UDP, buffer, clientaddr_in);
+                                serverUDP(u_UDP, buffer, clientaddr_in);
                                 
                                 exit(0);
+                            default:
+                                continue;
                                 
-                            default:	/* Daemon process comes here. */
-                                /* The daemon needs to remember
-                                * to close the new accept socket
-                                * after forking the child.  This
-                                * prevents the daemon from running
-                                * out of file descriptor space.  It
-                                * also means that when the server
-                                * closes the socket, that it will
-                                * allow the socket to be destroyed
-                                * since it will be the last close.
-                                */
-                                close(s_UDP);
                         }
                         
                     }/* De UDP */
@@ -304,11 +273,11 @@ char *argv[];
 		}/* Fin del bucle infinito de atención a clientes */
 		
         /* Cerramos los sockets UDP y TCP */
-        printmtof("Cierro la conexión", "debug.txt");
+        printmtof("Connection closed.", debug_file);
         close(ls_TCP);
         close(s_UDP);
     
-        printf("\nFin de programa servidor!\n");
+        printf("Server finished execution.\n");
         
 	default:		/* Parent process comes here. */
 		exit(0);
@@ -332,102 +301,62 @@ void serverTCP(int s, struct sockaddr_in clientaddr_in)
      * Realmente habria que cambiarlas para trabajar con arrays dinamicos
      * pero por ahora vamos a tener un unico fichero (y solo pa' leer)
      */
+     char temp_buf[1000];
      int nreadbytes = 0; /* Keeps the number of bytes read from file */
      int nwrittenbytes = 0;
      int rreqcnt = 1; /* Keeps count of read requests */
      char filename[100];
-     //rw_msg_t rw_msg;
-     //data_msg_t *data_msg = NULL;
-     //data_msg_t data_msg_rcv;
-     //ack_msg_t ack_msg;
-     //ack_msg_t *ack_msg_send = NULL;
      char str[1000];
      short msg_type = 0;
      FILE *ptr = NULL;
-     char last_block[3] = "00";//<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
-    int lastblock = 0;
+     char last_block[3] = "**";
+     int lastblock_reached = 0;
      int eof_flag;
+     char data_buf[550];
+     
+     // Log lines data
+    //char client_hostname[HOSTNAME_LEN]; // There is another hostname variable
+    char host_ipaddr[IPADDR_LEN];
+    char protocol[PTCL_LEN] = "TCP";
+    char host_port[PORT_LEN];
+    char operation[OP_DESC_LEN];
+    char error_description[ERR_DESC_LEN];
    /*******************************************************************/
-
-
-	int reqcnt = 0;		/* keeps count of number of requests */
-	char buf[TAM_BUFFER];		/* This example uses TAM_BUFFER byte messages. */
-	char hostname[MAXHOST];		/* remote host's name string */
+    
+	int reqcnt = 0;		
+	char buf[TAM_BUFFER];		
+	char hostname[MAXHOST];		
 	
     int len, len1, status;
-    struct hostent *hp;		/* pointer to host info for remote host */
-    long timevar;			/* contains time returned by time() */
+    struct hostent *hp;		
+    long timevar;			
     
-    struct linger linger;		/* allow a lingering, graceful close; */
-    				            /* used when setting SO_LINGER */
-    				
-	/* Look up the host information for the remote host
-	 * that we have connected with.  Its internet address
-	 * was returned by the accept call, in the main
-	 * daemon loop above.
-	 */
+    struct linger linger;		
 	 
-     status = getnameinfo((struct sockaddr *)&clientaddr_in,sizeof(clientaddr_in),
-                           hostname,MAXHOST,NULL,0,0);
-     if(status){
-           	/* The information is unavailable for the remote
-			 * host.  Just format its internet address to be
-			 * printed out in the logging information.  The
-			 * address will be shown in "internet dot format".
-			 */
-			 /* inet_ntop para interoperatividad con IPv6 */
-            if (inet_ntop(AF_INET, &(clientaddr_in.sin_addr), hostname, MAXHOST) == NULL)
-            	perror(" inet_ntop \n");
-             }
-    /* Log a startup message. */
+    status = getnameinfo((struct sockaddr *)&clientaddr_in,sizeof(clientaddr_in), hostname,MAXHOST,NULL,0,0);
+    if(status){
+        if (inet_ntop(AF_INET, &(clientaddr_in.sin_addr), hostname, MAXHOST) == NULL)
+            perror(" inet_ntop \n");
+    }
+    
+    // GET CLIENT'S IP ADDRESS AND PORT IN HUMAN FORMAT
+    strcpy(host_ipaddr, inet_ntoa(clientaddr_in.sin_addr));
+    snprintf(temp_buf, sizeof(temp_buf), "%d", ntohs(clientaddr_in.sin_port));
+    strcpy(host_port, temp_buf);
+
     time (&timevar);
-		/* The port number must be converted first to host byte
-		 * order before printing.  On most hosts, this is not
-		 * necessary, but the ntohs() call is included here so
-		 * that this program could easily be ported to a host
-		 * that does require it.
-		 */
+
 	printf("Startup from %s port %u at %s",
 		hostname, ntohs(clientaddr_in.sin_port), (char *) ctime(&timevar));
 
-		/* Set the socket for a lingering, graceful close.
-		 * This will cause a final close of this socket to wait until all of the
-		 * data sent on it has been received by the remote host.
-		 */
 	linger.l_onoff  =1;
 	linger.l_linger =1;
-	if (setsockopt(s, SOL_SOCKET, SO_LINGER, &linger,
-					sizeof(linger)) == -1) {
+	if (setsockopt(s, SOL_SOCKET, SO_LINGER, &linger, sizeof(linger)) == -1) {
 		errout(hostname);
 	}
-
-		/* Go into a loop, receiving requests from the remote
-		 * client.  After the client has sent the last request,
-		 * it will do a shutdown for sending, which will cause
-		 * an end-of-file condition to appear on this end of the
-		 * connection.  After all of the client's requests have
-		 * been received, the next recv call will return zero
-		 * bytes, signalling an end-of-file condition.  This is
-		 * how the server will know that no more requests will
-		 * follow, and the loop will be exited.
-		 */
     
 	while (len = recv(s, buf, TAM_BUFFER, 0)) {
-		if (len == -1) errout(hostname); /* error from recv */
-			/* The reason this while loop exists is that there
-			 * is a remote possibility of the above recv returning
-			 * less than TAM_BUFFER bytes.  This is because a recv returns
-			 * as soon as there is some data, and will not wait for
-			 * all of the requested data to arrive.  Since TAM_BUFFER bytes
-			 * is relatively small compared to the allowed TCP
-			 * packet sizes, a partial receive is unlikely.  If
-			 * this example had used 2048 bytes requests instead,
-			 * a partial receive would be far more likely.
-			 * This loop will keep receiving until all TAM_BUFFER bytes
-			 * have been received, thus guaranteeing that the
-			 * next recv at the top of the loop will start at
-			 * the begining of the next request.
-			 */
+		if (len == -1) errout(hostname); 
 			 		
 		while (len < TAM_BUFFER) {
 			len1 = recv(s, &buf[len], TAM_BUFFER-len, 0);
@@ -435,102 +364,126 @@ void serverTCP(int s, struct sockaddr_in clientaddr_in)
 			len += len1;
 		}
 		
-		if (buf[0] == '0' && buf[1] == '1') {
-		    printmtof("EN R_REQUEST SERVERS\n",
-			                  "debug.txt"); 
-            strcpy(filename, buf + 2);
-            char *data;
-            data = calloc(1, TFTP_DATA_SIZE);
-
-		     if ((lastblock = read_from_file(data, filename, nreadbytes)) == -1){
-                    printmtof("servidor.c: serverTCP: READ_TYPE: error in read_from_file",
-			                  "debug.txt");
-			        return;
+		if (buf[0] == '0' && buf[1] == '1') { // R_REQUEST
+		
+             strcpy(filename, buf + 2);
+             
+		     printmtof("server: tcp: received read request", debug_file);
+		     rrq_op(filename, temp_buf);
+		     write_log_data(hostname,
+                            host_ipaddr,
+                            protocol,
+                            host_port,
+                            temp_buf,
+                            "",
+                            (LOG_FILENAME));
+            
+             server_get_filepath(filename, temp_buf);
+		     if ((lastblock_reached = read_from_file((char *)data_buf, temp_buf, nreadbytes)) == -1){
+                printmtof("servidor.c: serverTCP: READ_TYPE: error in read_from_file", debug_file);
+		        return;
              }
              
-             int n_block = atoi("01");
+             if (lastblock_reached){
              
-		     char *data_msg = create_data_msg(n_block, data);
-		     
+		       strncpy(last_block, buf + 2, 2);
+		       last_block[2] = '\0';
+		       
+		       snprintf(temp_buf, sizeof(temp_buf), "server: tcp: sent last data block (nblock: %s)", last_block);
+		       printmtof(temp_buf, debug_file);
+		       
+		     }
+             
+		     char *data_msg = create_data_msg("01", data_buf); 
 		     nreadbytes += TFTP_DATA_SIZE;
-		     
 		     reqcnt++;
-
-		     sleep(1);
+		     sleep(1); // SIMULATE DELAY
 
 		     if (send(s, data_msg, TAM_BUFFER, 0) != TAM_BUFFER) errout(hostname);
+		     
+		     printmtof("server: tcp: sent data block (nblock: 01)", debug_file);
 
-		} else if (buf[0] == '0' && buf[1] == '2') {
-		    printmtof("EN W_REQUEST SERVERS\n",
-			                  "debug.txt"); 
+		} else if (buf[0] == '0' && buf[1] == '2') {// W_REQUEST
+		
 		     strcpy(filename, buf + 2);
+		
+		     printmtof("server: tcp: received write request", debug_file);
+		     
+		     wrq_op(filename, temp_buf);
+		     write_log_data(hostname,
+                            host_ipaddr,
+                            protocol,
+                            host_port,
+                            temp_buf,
+                            "",
+                            (LOG_FILENAME));
 		     
 		     char *ack_msg = create_ack_msg("00");
-		     
 		     reqcnt++;
-
-		     sleep(1);
+		     sleep(1); // SIMULATE DELAY
 
 		     if (send(s, ack_msg, TAM_BUFFER, 0) != TAM_BUFFER) errout(hostname);
 		     
+		     printmtof("server: tcp: sent ack (nblock: 00)", debug_file);
+		     
         } else if (buf[0] == '0' && buf[1] == '4') { //ACK
-		    printmtof("EN ACK_TYPE SERVERS\n",
-			                  "debug.txt");
-		    char nblock[3];
-		    strncpy(nblock, buf + 2, 2);
-		    nblock[2] = '\0';
-		    
-		    char *data;
-		    data = calloc(1, TFTP_DATA_SIZE);
-
-		    if (('0' == last_block[0] && '0' != last_block[1]) && (nblock[0] == last_block[0] && nblock[1] == last_block[1])){
-			    fprintf(stderr,"\nReached end of file\n\n");
-			    goto END_OF_FILE;
-		    }
 		    
 		    /*
 		     * Para el ACK X:
 		     *      1- Enviar bloque X + 1
 		     */   
 		     
-		     if ((lastblock = read_from_file(data, filename, nreadbytes)) == -1){//<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< &buf???
-		            fprintf(stderr, "servidor.c: DATA_TYPE: error in read_from_file\n");
-			        return;
-		     }
+		    char nblock[3];
+		    nblock[0] = buf[2], nblock[1] = buf[3], nblock[2] = '\0';
+		    
+		    snprintf(temp_buf, sizeof(temp_buf), "server: tcp: received ACK number %s", nblock);
+		    printmtof(temp_buf, debug_file);
 
-		     if (lastblock == 1){
-		        strncpy(last_block, buf + 2, 2);
-		        last_block[2] = '\0';
-		      }
-		      
-
-		     printf("El buffer es %s\n", data);
-		     
-		     
-		     int n_block = atoi(nblock);
-
-		     char *data_msg = create_data_msg(n_block, data);
-
+		    if (('*' != last_block[0] && '*' != last_block[1])
+		    && (nblock[0] == last_block[0] && nblock[1] == last_block[1])){
+			    printmtof("clientcp: done reading source file", debug_file);
+			    goto END_OF_FILE;
+		    }
+		    
+		    server_get_filepath(filename, temp_buf);
+		    if ((lastblock_reached = read_from_file((char *)data_buf, temp_buf, nreadbytes)) == -1){//<<<<<<<<<<<<<<<<<<<<<<<<< &buf???
+	           fprintf(stderr, "servidor.c: DATA_TYPE: error in read_from_file\n");
+		       return;
+		    }
+		    
+		     inc_nblock(nblock);
+             
+		     char *data_msg = create_data_msg(nblock, data_buf);
 		     nreadbytes += TFTP_DATA_SIZE;
-		     
 		     reqcnt++;
-
 		     sleep(1);
 
 		     if (send(s, data_msg, TAM_BUFFER, 0) != TAM_BUFFER) errout(hostname);
-		
+		     
+		     if (lastblock_reached){
+		    
+		       strcpy(last_block, nblock);
+		       
+		       snprintf(temp_buf, sizeof(temp_buf), "server: tcp: sent last data block (nblock: %s)", last_block);
+		       printmtof(temp_buf, debug_file);
+		       
+		    } else {
+		    
+             snprintf(temp_buf, sizeof(temp_buf), "server: tcp: sent data block (nblock: %s)", nblock);
+             printmtof(temp_buf, debug_file);
+		     
+		    }
+		     
 		} else if (buf[0] == '0' && buf[1] == '3') { // DATA
-		    printmtof("EN DATA_TYPE SERVERS\n",
-			                  "debug.txt"); 
+		
             char data[TFTP_DATA_SIZE + 1];
-            strcpy(data, buf + 5);
-            data[TFTP_DATA_SIZE] = '\0';
+            strcpy(data, buf + 4);
             
             char nblock[3];
-		    strncpy(nblock, buf + 2, 2);
-		    nblock[2] = '\0';
+		    nblock[0] = buf[2], nblock[1] = buf[3], nblock[2] = '\0';
 		    
-		    int n_block = atoi(nblock);
+		    snprintf(temp_buf, sizeof(temp_buf), "server: tcp: received data block (nblock: %s, size: %d)", nblock, strlen(data));
+		    printmtof(temp_buf, debug_file);
 		    
 		    /*
 		     * Para el bloque X
@@ -538,176 +491,67 @@ void serverTCP(int s, struct sockaddr_in clientaddr_in)
 		     *      2- Mandar ACK (n = X)
 		     */
 		     
-		    if (TFTP_DATA_SIZE == (sizeof(data) - 1)) { // DATA = 512     //<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
-		        
-		        if ((write_data_into_file(data, filename, nwrittenbytes)) == -1){
-		            fprintf(stderr, "servidor.c: DATA_TYPE: error in write_data_into_file\n");
-			        return;
-		        }
-		        
+		    if (0 == strlen(data)) { // DATA = 0
 		        
 		        char *ack_msg = create_ack_msg(nblock);
-
-		        nwrittenbytes += TFTP_DATA_SIZE;
-		        
 		        reqcnt++;
-
-		     sleep(1);
-
-		     if (send(s, ack_msg, TAM_BUFFER, 0) != TAM_BUFFER) errout(hostname);
+		        sleep(1);
+		        if (send(s, ack_msg, TAM_BUFFER, 0) != TAM_BUFFER) errout(hostname);
 		        
-		    } else if (TFTP_DATA_SIZE > (sizeof(data) - 1)) { // DATA < 512  //<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+		        snprintf(temp_buf, sizeof(temp_buf), "server: tcp: sent ack (nblock: %s)", nblock);
+		        printmtof(temp_buf, debug_file);
+		        
+			    goto END_OF_FILE;
+			    
+		    } else if (TFTP_DATA_SIZE > strlen(data)) { // DATA < 512  
 
-		        if ((write_data_into_file(data, filename, nwrittenbytes)) == -1){
+                server_get_filepath(filename, temp_buf);
+		        if ((write_data_into_file(data, temp_buf, nwrittenbytes)) == -1){
 		            fprintf(stderr, "servidor.c: DATA_TYPE: error in write_data_into_file\n");
 			        return;
 		        }
+		        
+		        snprintf(temp_buf, sizeof(temp_buf), "server: tcp: wrote last data block (nblock: %s)", nblock);
+		        printmtof(temp_buf, debug_file);
 
 		        char *ack_msg = create_ack_msg(nblock);
-
 		        nwrittenbytes += strlen(data);
 		        reqcnt++;
-
 		        sleep(1);
 
 		        if (send(s, ack_msg, TAM_BUFFER, 0) != TAM_BUFFER) errout(hostname);
 		        
+		        snprintf(temp_buf, sizeof(temp_buf), "server: tcp: sent ack (nblock: %s)", nblock);
+		        printmtof(temp_buf, debug_file);
+		        
 				goto END_OF_FILE;
 				 
-		    } else if (0 == sizeof(data)) { // DATA = 0
-		    
-		        printf("Received block number %d\n", n_block);
+		    } else { // DATA = 512    
+		        
+		        server_get_filepath(filename, temp_buf);
+		        if ((write_data_into_file(data, temp_buf, nwrittenbytes)) == -1){
+		            fprintf(stderr, "servidor.c: DATA_TYPE: error in write_data_into_file\n");
+			        return;
+		        }
+		        
 		        char *ack_msg = create_ack_msg(nblock);
-		        
+		        nwrittenbytes += TFTP_DATA_SIZE;
 		        reqcnt++;
+		        sleep(1);
 
-		     sleep(1);
-
-		     if (send(s, ack_msg, TAM_BUFFER, 0) != TAM_BUFFER) errout(hostname);
+		        if (send(s, ack_msg, TAM_BUFFER, 0) != TAM_BUFFER) errout(hostname);
 		        
-			    goto END_OF_FILE;
-			    
-		    } 
+		        snprintf(temp_buf, sizeof(temp_buf), "server: tcp: sent ack (nblock: %s)", nblock);
+		        printmtof(temp_buf, debug_file);
+		        
+		    }
 
 		} else {
-			printf("servidor: default: Invalid type of message\n");
-		    	return;
+			fprintf(stderr, "serverTCP: Invalid message type\n");
+            exit(1);
 		}
-	
-		// Vamo a aserlo con 1 fixero
-		// Ya si eso luego bien (arrays dinamicos con structs para cada fichero)
-/*
-		switch(msg_type) { 
-		case READ_TYPE:
-		    
-		    memcpy((void *)&rw_msg, (const void *)&buf, sizeof(rw_msg));
-
-		    data_msg = create_data_msg(1);
-		    
-		     
-		     if ((last_block = read_from_file(data_msg, rw_msg.filename, nreadbytes)) == -1){
-                    printmtof("servidor.c: serverTCP: READ_TYPE: error in read_from_file",
-			                  "debug.txt");
-			        return;
-             }
-		     
-		     memcpy((void *)buf, (const void *)data_msg, sizeof(*data_msg));
-		     strncpy(filename,(const char*) &(rw_msg.filename), sizeof(filename));
-		    
-		     nreadbytes += TFTP_DATA_SIZE;
-		break;
-		case WRITE_TYPE:
-
-		     memcpy((void *)&rw_msg, (const void *)&buf, sizeof(rw_msg));
-		     strncpy(filename,(const char*) &(rw_msg.filename), sizeof(filename));
-		     
-
-
-		     ack_msg_send = create_ack_msg(0);
-		     memcpy((void *)buf, (const void *)ack_msg_send, sizeof(*ack_msg_send));
-		     
-		break;
-		case ACK_TYPE:
-			
-		    memcpy((void *)&ack_msg, (const void *)&buf, sizeof(ack_msg));
-		    
-		    if (0 != last_block && last_block == ack_msg.n_block){
-			    printmtof("GOTO ",
-		                  "debug.txt");
-		        goto END_OF_FILE;
-		    }
-		    
-		    data_msg = create_data_msg(ack_msg.n_block + 1);
-
-
-		     if ((last_block = read_from_file(data_msg, filename, nreadbytes)) == -1){
-                    printmtof("servidor.c: serverTCP: ACK_TYPE: error in read_from_file",
-			                  "debug.txt");
-			        return;
-             }
-             
-		     memcpy((void *)buf, (const void *)data_msg, sizeof(*data_msg));
-		     nreadbytes += TFTP_DATA_SIZE;
-
-		break;
-		case DATA_TYPE:
-
-		    memcpy((void *)&data_msg_rcv, (const void *)&buf, sizeof(data_msg_rcv));
-		    
-		     
-		     if (TFTP_DATA_SIZE == strlen(data_msg_rcv.data)) {	
-		        
-		         if ((write_data_into_file(data_msg_rcv, filename, nwrittenbytes)) == -1){
-                    printmtof("servidor.c: serverTCP: DATA_TYPE: data = 512: error in write_data_into_file",
-			                  "debug.txt");
-			        return;
-                 }
-		         
-		         ack_msg_send = create_ack_msg(data_msg_rcv.n_block);
-		         memcpy((void *)buf, (const void *)ack_msg_send, sizeof(*ack_msg_send));
-		         nwrittenbytes += TFTP_DATA_SIZE;
-		         
-		      } else if (TFTP_DATA_SIZE > strlen(data_msg_rcv.data)) {
-            	 
-            	 if ((write_data_into_file(data_msg_rcv, filename, nwrittenbytes)) == -1){
-                    printmtof("servidor.c: serverTCP: DATA_TYPE: data < 512: error in write_data_into_file",
-			                  "debug.txt");
-			        return;
-                 }
-            	 
-            	 ack_msg_send = create_ack_msg(data_msg_rcv.n_block);
-	             memcpy((void *)buf, (const void *)ack_msg_send, sizeof(*ack_msg_send));
-		         nwrittenbytes += strlen(data_msg_rcv.data);
-		         printmtof("GOTO menos que 52 ",
-		                          "debug.txt");
-		         eof_flag = 1;
-		         
-		      } else if (0 == strlen(data_msg_rcv.data)) {
-		             
-		         ack_msg_send = create_ack_msg(data_msg_rcv.n_block);
-	             memcpy((void *)buf, (const void *)ack_msg_send, sizeof(*ack_msg_send));
-                 printmtof("GOTO igual a 0 ",
-		                          "debug.txt");
-		         eof_flag = 1;
-		      }
-		      printmtof("Salgo de DataType",
-	                          "debug.txt");
-		break;
-		case ERROR_TYPE:
-		
-
-		     
-		break;
-		default:
-		    printmtof("servidor.c: serverTCP: default: invalid message type\n",
-	                          "debug.txt");
-		    return;
-		break;
-		}
-*/		
-		
-		    
-	}
+	    
+	}// End of while
 
 END_OF_FILE:
 
@@ -715,11 +559,18 @@ END_OF_FILE:
 
 	time (&timevar);
 
+    suc_op(filename, temp_buf);
+    write_log_data(hostname,
+                   host_ipaddr,
+                   protocol,
+                   host_port,
+                   temp_buf,
+                   "",
+                   (LOG_FILENAME));
+
 	printf("Completed %s port %u, %d requests, at %s\n",
 		hostname, ntohs(clientaddr_in.sin_port), reqcnt, (char *) ctime(&timevar));
 		
-
-
 }
 
 /*
@@ -744,8 +595,8 @@ void errout(char *hostname)
  */
 void serverUDP(int s, char *buffer, struct sockaddr_in clientaddr_in)
 {
-    struct in_addr reqaddr;	/* for requested host's address */
-    struct hostent *hp;		/* pointer to host info for requested host */
+    struct in_addr reqaddr;	
+    struct hostent *hp;		
     struct addrinfo hints, *res;
     int nc, errcode;
 	int addrlen;
@@ -754,31 +605,38 @@ void serverUDP(int s, char *buffer, struct sockaddr_in clientaddr_in)
      * Realmente habria que cambiarlas para trabajar con arrays dinamicos
      * pero por ahora vamos a tener un unico fichero (y solo pa' leer)
      */
-     static int nreadbytes = 0; /* Keeps the number of bytes read from file */
-     //static int nwrittenbytes = 0;
      int rreqcnt = 1; /* Keeps count of read requests */
-     char filename[100];
-     //rw_msg_t rw_msg;
-     //data_msg_t *data_msg = NULL;
-     //data_msg_t data_msg_rcv;
-     //ack_msg_t ack_msg;
-     //ack_msg_t *ack_msg_send = NULL;
-     char str[1000];
-     //FILE *ptr = NULL;
-     static int last_block = 0;
-     int eof_flag;
-     
-     int numbytes;
+     char temp_buf[1000];
+     char filename[128];
+     //char filename[100];
+     //char str[1000];
+     //static int last_block = 0;
+     //int eof_flag;
+
+    // Log lines data
+    //char client_hostname[HOSTNAME_LEN]; // There is another hostname variable
+    char host_ipaddr[IPADDR_LEN];
+    char protocol[PTCL_LEN] = "UDP";
+    char host_port[PORT_LEN];
+    char operation[OP_DESC_LEN];
+    char error_description[ERR_DESC_LEN];
+    char hostname[MAXHOST];
    /*******************************************************************/
 
    	addrlen = sizeof(struct sockaddr_in);
-
-    // Vamo a aserlo con 1 fixero
-    // Ya si eso luego bien (arrays dinamicos con structs para cada fichero)
+   	
+   	int status = getnameinfo((struct sockaddr *)&clientaddr_in,sizeof(clientaddr_in), hostname,MAXHOST,NULL,0,0);
+    if(status){
+        if (inet_ntop(AF_INET, &(clientaddr_in.sin_addr), hostname, MAXHOST) == NULL)
+            perror("server: udp: inet_ntop \n");
+    }
+   	
+   	// GET CLIENT'S IP ADDRESS AND PORT IN HUMAN FORMAT
+    strcpy(host_ipaddr, inet_ntoa(clientaddr_in.sin_addr));
+    snprintf(temp_buf, sizeof(temp_buf), "%d", ntohs(clientaddr_in.sin_port));
+    strcpy(host_port, temp_buf);
 
     if (buffer[0] == '0' && buffer[1] == '1'){ // READ REQUEST
-        printmtof("ENTRO EN READ",
-                            "debug.txt");
         /*
          * 1- Check if file exists
          *     + If it does not, error message and exit
@@ -794,25 +652,49 @@ void serverUDP(int s, char *buffer, struct sockaddr_in clientaddr_in)
          *     + Close file
         */
         
-        FILE *ptr = NULL;
-        char filename[128];
         strcpy(filename, buffer + 2);
-        printmtof("oh Bloody hell",
-                            "debug.txt");
-        if ((ptr = fopen(filename, "r")) == NULL) {
-            perror("serverUDP: fopen");
-            // TODO <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< Send error message
+        
+        printmtof("server: udp: received read request", debug_file);
+        rrq_op(filename, temp_buf);
+	    write_log_data(hostname,
+                       host_ipaddr,
+                       protocol,
+                       host_port,
+                       temp_buf,
+                       "",
+                       (LOG_FILENAME)); 
+        
+        server_get_filepath(filename, temp_buf);
+        FILE *ptr = NULL;            
+        if ((ptr = fopen(temp_buf, "r")) == NULL || access(temp_buf, F_OK) == -1) { // FILE NOT FOUND
+            snprintf(temp_buf, sizeof(temp_buf), "server: udp: file '%s' does not exist, sending error packet and aborting...", filename);
+            printmtof(temp_buf, debug_file);
+            rrq_op(filename, temp_buf);
+            write_log_data(hostname,
+                           host_ipaddr,
+                           protocol,
+                           host_port,
+                           temp_buf,
+                           "01 - FILE NOT FOUND",
+                           (LOG_FILENAME));
+            char *e_msg = create_error_msg("01", "FILE NOT FOUND");
+            sendto(s, e_msg, strlen(e_msg), 0, (struct sockaddr *)&clientaddr_in, addrlen);
+            printmtof("Connection aborted", debug_file);
             exit(1);
         }
         
         // Look for file size to see how much to read
         
-        int bytes_left;
+        int bytes_left, numbytes;
         fseek(ptr, 0, SEEK_END);
         bytes_left = ftell(ptr);
         fseek(ptr, 0, SEEK_SET);
-        
-        int nblock = 1;
+        if (bytes_left == 0)
+            ++bytes_left;
+        else if (bytes_left%TFTP_DATA_SIZE == 0)
+            --bytes_left;
+                
+        char nblock[] = "01";
         while (bytes_left > 0) {
         
             char read_data[TFTP_DATA_SIZE + 1];
@@ -834,61 +716,56 @@ void serverUDP(int s, char *buffer, struct sockaddr_in clientaddr_in)
             
             char *data_msg = create_data_msg(nblock, read_data);
             
-            if (numbytes = sendto(s, data_msg, strlen(data_msg), 0, (struct sockaddr *)&clientaddr_in, addrlen)){
-                // Print nice message
-            }
-            
-            if (numbytes == -1 ) {
+            numbytes = sendto(s, data_msg, strlen(data_msg), 0, (struct sockaddr *)&clientaddr_in, addrlen);
+            if (numbytes == -1) {
                 perror("serverUDP: Read Request: sendto");
                 exit(1);
+            } else {
+                snprintf(temp_buf, sizeof(temp_buf), "server: udp: sent data block (nblock: %s)", nblock);
+                printmtof(temp_buf, debug_file);
             }
             
             int times;
             for (times = 0; times <= 5; times++) {
             
                 if (times == 5){
-                    printf("Server: Max number of Tries %d reached \n", times);
+                    snprintf(temp_buf, sizeof(temp_buf), "server: udp: max number of tries %d reached\n", times);
+                    printmtof(temp_buf, debug_file);
                     exit(1);
                 }
                 
-                numbytes = wait_ack(s, buffer, clientaddr_in, addrlen);
+                numbytes = wait_ack(s, buffer, &clientaddr_in, addrlen);
+		        printmtof("server: udp: received ACK", debug_file);
                 
                 if (numbytes == -1) { // ERROR
                     perror("serverUDP: recvfrom after check_timeout");
                     exit(1);
                 } else if (numbytes == -2) { // TIMEOUT
-                    printf("ServerUDP: Nº %d of try \n", times + 1);
-                    // TODO <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< Send error message
+                
+                    snprintf(temp_buf, sizeof(temp_buf), "server: udp: try no. %d. Trying again...", times + 1);
+                    printmtof(temp_buf, debug_file);
+                    
+                    int bytes = sendto(s, data_msg, strlen(data_msg), 0, (struct sockaddr *)&clientaddr_in, addrlen);
+                    if (bytes == -1) {
+                        perror("server: udp: timeout: sendto");
+                        exit(1);
+                    } else {
+                        snprintf(temp_buf, sizeof(temp_buf), "server: udp: sent data block again (nblock: %s)", nblock);
+                        printmtof(temp_buf, debug_file);
+                    }
+                    
                     continue;
                 } else { // MESSAGE RECEIVED
                     break;
                 }
             }
             
-            ++nblock;
+            buffer[numbytes] = '\0';
+            
+            inc_nblock(nblock);
         }
         
         fclose(ptr);
-    
-        /*
-        printmtof("EN READ_TYPE",
-                        "debug.txt");
-        memcpy((void *)&rw_msg, (const void *)buffer, sizeof(rw_msg));
-
-        data_msg = create_data_msg(1);
-
-        if ((last_block = read_from_file(data_msg, rw_msg.filename, nreadbytes)) == -1){
-            printmtof("servidor.c: serverUDP: READ_TYPE: error in read_from_file",
-                        "debug.txt");
-            return-1;
-        }
-
-        memcpy(buffer, (const void *)data_msg, sizeof(*data_msg));
-        strncpy(filename,(const char*) &(rw_msg.filename), sizeof(filename));
-
-        nreadbytes += TFTP_DATA_SIZE;
-           
-        */
          
     } else if (buffer[0] == '0' && buffer[1] == '2') { // WRITE REQUEST
         /*
@@ -905,52 +782,98 @@ void serverUDP(int s, char *buffer, struct sockaddr_in clientaddr_in)
          *         * Increment block number
          *     + Close file
         */
+
+        strcpy(filename, buffer + 2);
         
+        printmtof("server: udp: received write request", debug_file);
+        wrq_op(filename, temp_buf);
+	    write_log_data(hostname,
+                       host_ipaddr,
+                       protocol,
+                       host_port,
+                       temp_buf,
+                       "",
+                       (LOG_FILENAME)); 
+        
+        
+        int numbytes;
         char *ack_msg = create_ack_msg("00"); // First is ACK 0
-        //char last_data_msg[TFTP_DATA_SIZE + 1];
-        //strcpy(last_data_msg, buffer);
         
-        //char last_ack_msg[10];
-        //strcpy(last_ack_msg, ack_msg);
-        
-        if (numbytes = sendto(s, ack_msg, strlen(ack_msg), 0, (struct sockaddr *)&clientaddr_in, addrlen)){
-                // Print nice message
-        }
-        
-        if (numbytes == -1 ) {
+        char last_data_msg[TFTP_DATA_SIZE + 1];
+        strcpy(last_data_msg, buffer);
+        char last_ack_msg[10];
+        strcpy(last_ack_msg, ack_msg);
+			                  
+        numbytes = sendto(s, ack_msg, strlen(ack_msg), 0, (struct sockaddr *)&clientaddr_in, addrlen);
+        if (numbytes == -1) {
             perror("serverUDP: Write Request: sendto ACK 00");
             exit(1);
         }
         
-        char filename[128];
-        strcpy(filename, buffer + 2);
+        printmtof("server: udp: sent ack (nblock: 00)", debug_file);
+
+        
         // Aqui hace un strcat <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
         
-        // DUPLICATE FILE, SENDING ERROR PACKET
-        
+        server_get_filepath(filename, temp_buf);
+        if (access(temp_buf, F_OK) != -1) { // DUPLICATE FILE
+            snprintf(temp_buf, sizeof(temp_buf), "server: udp: file '%s' already exists, sending error packet and aborting...", filename);
+            printmtof(temp_buf, debug_file);
+            wrq_op(filename, temp_buf);
+            write_log_data(hostname,
+                           host_ipaddr,
+                           protocol,
+                           host_port,
+                           temp_buf,
+                           "06 - FILE ALREADY EXISTS",
+                           (LOG_FILENAME));
+            char *e_msg = create_error_msg("06", "FILE ALREADY EXISTS");
+            sendto(s, e_msg, strlen(e_msg), 0, (struct sockaddr *)&clientaddr_in, addrlen);
+            printmtof("Connection aborted", debug_file);
+            exit(1);
+        }
         FILE *ptr;
-        if ((ptr = fopen(filename, "w")) == NULL) {
-            perror("serverUDP: fopen");
-            // TODO <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< Send error message
+        if ((ptr = fopen(temp_buf, "w")) == NULL) { // ACCESS DENIED
+            snprintf(temp_buf, sizeof(temp_buf), "server: udp: access to file '%s' denied, sending error packet and aborting...", filename);
+            printmtof(temp_buf, debug_file);
+            wrq_op(filename, temp_buf);
+            write_log_data(hostname,
+                           host_ipaddr,
+                           protocol,
+                           host_port,
+                           temp_buf,
+                           "02 - ACCESS VIOLATION",
+                           (LOG_FILENAME));
+            char *e_msg = create_error_msg("02", "ACCESS VIOLATION");
+            sendto(s, e_msg, strlen(e_msg), 0, (struct sockaddr *)&clientaddr_in, addrlen);
+            printmtof("Connection aborted", debug_file);
             exit(1);
         }
         
-        int nbytes_written;
+        int nbytes_written = 0;
+        int total = 0;
         do {
             // RECEIVE DATA
-            if (numbytes = recvfrom(s, buffer, TAM_BUFFER-1, 0, (struct sockaddr *)&clientaddr_in, &addrlen)) {
-                //Print nice message
-            }
-            
-            printf("Server: packet is %d bytes long\n", numbytes);
-            buffer[numbytes] = '\0';
-            
+			int addr_len = sizeof(clientaddr_in);
+            numbytes = recvfrom(s, buffer, TAM_BUFFER - 1, 0, (struct sockaddr *)&clientaddr_in, &addr_len);
             if (numbytes == -1 ) {
                 perror("serverUDP: Write Request: recvfrom DATA");
                 exit(1);
             }
             
-            // SEND LAST ACK AGAIN IF NOT REACHED
+            char nblock[3];
+		    nblock[0] = buffer[2], nblock[1] = buffer[3], nblock[2] = '\0';
+            
+            snprintf(temp_buf, sizeof(temp_buf), "server: udp: received data block (nblock: %s, size: %d)", nblock, strlen(buffer + 4));
+		    printmtof(temp_buf, debug_file);
+		    
+            buffer[numbytes] = '\0';
+            
+            // SEND LAST ACK AGAIN
+            if(!strcmp(buffer, last_data_msg)){
+				sendto(s, last_ack_msg, strlen(last_ack_msg), 0, (struct sockaddr *)&clientaddr_in, addrlen);
+				continue;
+            }
             
             // WRITE FILE
             nbytes_written = strlen(buffer + 4);
@@ -958,149 +881,49 @@ void serverUDP(int s, char *buffer, struct sockaddr_in clientaddr_in)
                 perror("serverUDP: Write Request: fwrite");
                 exit(1);
             }
-            //strcpy(last_data_msg, buffer);
+            strcpy(last_data_msg, buffer); // SAVE LAST DATA FOR RESENDING
             
             // SEND ACK
-            char nblock[3];
-            strncpy(nblock, buffer + 2, 2);
-            nblock[2] = '\0';
             char *ack_msg = create_ack_msg(nblock);
-            
-            if (numbytes = sendto(s, ack_msg, strlen(ack_msg), 0, (struct sockaddr *)&clientaddr_in, addrlen)){
-                // Print nice message
-            }
-            
+            numbytes = sendto(s, ack_msg, strlen(ack_msg), 0, (struct sockaddr *)&clientaddr_in, addrlen);
             if (numbytes == -1 ) {
                 perror("serverUDP: Read Request: sendto ACK");
                 exit(1);
             }
+            strcpy(last_ack_msg, ack_msg); // SAVE LAST ACK FOR RESENDING
             
-            printf("Server: sent %d bytes\n", numbytes);
-            //strcpy(last_ack_msg, ack_msg);
+            snprintf(temp_buf, sizeof(temp_buf), "server: udp: sent ack (nblock: %s)", nblock);
+		    printmtof(temp_buf, debug_file);
             
         } while (nbytes_written == TFTP_DATA_SIZE);
         
-        printf("Server: new file %s successfully made\n", filename);
+        snprintf(temp_buf, sizeof(temp_buf), "server: udp: file %s successfully written", filename);
+		printmtof(temp_buf, debug_file);
         fclose (ptr);
-    } else {
-        fprintf(stderr, "serverUDP: Invalid message type\n");
+        
+    } else { // SENDING ERROR PACKET - 04 ILEGAL OPERATION FILE
+    
+        printmtof("server: udp: unknown request received, sending error packet and aborting...", debug_file);
+        write_log_data(hostname,
+                           host_ipaddr,
+                           protocol,
+                           host_port,
+                           temp_buf,
+                           "04 - ILLEGAL TFTP OPERATION",
+                           (LOG_FILENAME));
+        char *e_msg = create_error_msg("04", "ILLEGAL TFTP OPERATION");
+        sendto(s, e_msg, strlen(e_msg), 0, (struct sockaddr *)&clientaddr_in, addrlen);
+        printmtof("Connection aborted", debug_file);
         exit(1);
     }
-        
-        
-        
-        /*
-        printmtof("EN WRITE_TYPE",
-                        "debug.txt");
-        memcpy((void *)&rw_msg, (const void *)buffer, sizeof(rw_msg));
-        strncpy(filename,(const char*) &(rw_msg.filename), sizeof(filename));
-
-
-        ack_msg_send = create_ack_msg(0);
-        memcpy((void *)buffer, (const void *)ack_msg_send, sizeof(*ack_msg_send));
-        */
     
-    /*else if (buffer[0] == '0' && buffer[1] == '3') {
-        printmtof("EN ACK_TYPE",
-                        "debug.txt");
-        memcpy((void *)&ack_msg, (const void *)buffer, sizeof(ack_msg));
-        printf("Last_block ANTES era %d y nreadbytes %d\n", last_block, nreadbytes);
-        if (0 != last_block && last_block == ack_msg.n_block){
-            printmtof("GOTO ",
-                    "debug.txt");
-            return;
-        }
-
-        data_msg = create_data_msg(ack_msg.n_block + 1);
-
-
-        if ((last_block = read_from_file(data_msg, filename, nreadbytes)) == -1){
-            printmtof("servidor.c: serverUDP: ACK_TYPE: error in read_from_file",
-                    "debug.txt");
-            return;
-        }
-        
-        printf("Last_block AHORA es %d\n", last_block);
-
-        memcpy((void *)buffer, (const void *)data_msg, sizeof(*data_msg));
-        nreadbytes += TFTP_DATA_SIZE;
-
-    } else if (buffer[0] == '0' && buffer[1] == '4') {
-        printmtof("EN DATA_TYPE",
-                        "debug.txt");
-        memcpy((void *)&data_msg_rcv, (const void *)buffer, sizeof(data_msg_rcv));
-
-        char jaja[100];
-        snprintf(jaja, 100, "El tamaño de esta huea es %ld\n", strlen(data_msg_rcv.data));//<<<<<<<<<<<<<< AQUI STRLEN SI FUNCIONA -.-
-        printmtof(jaja,
-                        "debug.txt");
-        if (TFTP_DATA_SIZE == strlen(data_msg_rcv.data)) {	
-
-            if ((write_data_into_file(data_msg_rcv, filename, nwrittenbytes)) == -1){
-                printmtof("servidor.c: serverUDP: DATA_TYPE: data = 512: error in write_data_into_file",
-                        "debug.txt");
-                return;
-            }
-
-            ack_msg_send = create_ack_msg(data_msg_rcv.n_block);
-            memcpy((void *)buffer, (const void *)ack_msg_send, sizeof(*ack_msg_send));
-            nwrittenbytes += TFTP_DATA_SIZE;
-
-        } else if (TFTP_DATA_SIZE > strlen(data_msg_rcv.data)) {
-
-            if ((write_data_into_file(data_msg_rcv, filename, nwrittenbytes)) == -1){
-                printmtof("servidor.c: serverUDP: DATA_TYPE: data < 512: error in write_data_into_file",
-                        "debug.txt");
-                return;
-            }
-
-            ack_msg_send = create_ack_msg(data_msg_rcv.n_block);
-            memcpy((void *)buffer, (const void *)ack_msg_send, sizeof(*ack_msg_send));
-            nwrittenbytes += strlen(data_msg_rcv.data);
-            printmtof("GOTO menos que 52 ",
-                    "debug.txt");
-                    
-            eof_flag = 1;
-
-        } else if (0 == strlen(data_msg_rcv.data)) {
-
-            ack_msg_send = create_ack_msg(data_msg_rcv.n_block);
-            memcpy((void *)buffer, (const void *)ack_msg_send, sizeof(*ack_msg_send));
-            printmtof("GOTO igual a 0 ",
-                    "debug.txt");
-            eof_flag = 1;
-        }
-        printmtof("Salgo de DataType",
-        "debug.txt");
-    } else if (buffer[0] == '0' && buffer[1] == '5') {
-
-
-
-     } else {
-        printmtof("servidor.c: serverUDP: default: invalid message type\n",
-        "debug.txt");
-        return;
-    }
-    
-    msg_type = 0;
-
-        
-    printmtof("Enviando mensaje al Cliente",
-            "debug.txt");
-    
-	// nc = sendto (s, buffer, TAM_BUFFER, 0, (struct sockaddr *)&clientaddr_in, addrlen);
-			
-    if (eof_flag) {
-        printmtof("ME SALGO",
-            "debug.txt");
-        return;
-    }	
-			
-	if (nc == -1) {
-         perror("serverUDP");
-         printf("%s: sendto error\n", "serverUDP");
-         return;
-    } 
-*/   
-   
+    suc_op(filename, temp_buf);
+    write_log_data(hostname,
+                   host_ipaddr,
+                   protocol,
+                   host_port,
+                   temp_buf,
+                   "",
+                   (LOG_FILENAME)); 
+  
  }
