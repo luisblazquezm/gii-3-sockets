@@ -1,6 +1,0 @@
-Enlace ppal -----> https://github.com/amit-mittal/TFTP
-
-Otros repositorios interesantes
-
-https://github.com/crossbowerbt/tftpserver
-https://github.com/ideawu/tftpx
