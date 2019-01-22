@@ -1,2 +1,2 @@
 # Sockets
-Trabajo de Redes I (Sockets en C)
+Protocolos de Transporte implementados TCP - UDP
