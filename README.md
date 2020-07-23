@@ -3,7 +3,7 @@
 ![Main Code](https://img.shields.io/badge/code-c-blue)
 
 # Description
-Project about the implementation of Berkeley sockets in the transport layer protocols TCP - UDP for the subject "Redes" in Computer Engineering Degree.
+Project about the implementation using C language of Berkeley sockets in the transport layer protocols TCP - UDP for the subject "Redes" in Computer Engineering Degree.
 
 ## Contributors ✨
 <!-- ALL-CONTRIBUTORS-LIST:START - Do not remove or modify this section -->
